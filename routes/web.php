@@ -79,6 +79,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/sales/invoices/summary/print', [SalesController::class, 'printSummaryInvoice'])->name('sales.invoices.summary.print')->middleware('role:admin,accountant');
     Route::get('/sales/invoices/{sale}', [SalesController::class, 'showInvoice'])->name('sales.invoices.show')->middleware('role:admin,accountant');
     Route::post('/sales/invoices/{sale}/payments', [App\Http\Controllers\PaymentController::class, 'store'])->name('sales.invoices.payments.store')->middleware('role:admin,accountant,staff');
+    Route::post('/sales/{sale}/update-payment-method', [SalesController::class, 'updatePaymentMethod'])->name('sales.update-payment-method')->middleware('role:admin,accountant,staff');
     
     // Refunds (Staff can request, Admin can approve)
     Route::get('/sales/{sale}/refund', [App\Http\Controllers\RefundController::class, 'create'])->name('refunds.create')->middleware('role:admin,staff,accountant');
@@ -106,6 +107,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/orders', [OrderController::class, 'store'])->name('orders.store')->middleware('role:admin,accountant');
     Route::get('/orders/create', [OrderController::class, 'create'])->name('orders.create')->middleware('role:admin,accountant');
     Route::put('/orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.update-status')->middleware('role:admin,accountant');
+    Route::post('/orders/{order}/pay', [OrderController::class, 'storePayment'])->name('orders.pay')->middleware('role:admin,accountant');
     
     Route::get('/orders/suggestions', [App\Http\Controllers\OrderSuggestionsController::class, 'index'])->name('orders.suggestions.index')->middleware('role:admin,staff,accountant');
     Route::get('/orders/suggestions/top-selling', [App\Http\Controllers\OrderSuggestionsController::class, 'topSelling'])->name('orders.suggestions.top-selling')->middleware('role:admin,staff,accountant');
@@ -211,6 +213,16 @@ Route::middleware('auth')->group(function () {
     
     // Expenses (Accountant & Admin)
     Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index')->middleware(['role:admin,accountant', 'permission:finance.view']);
+    Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store')->middleware(['role:admin,accountant']);
+    Route::put('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update')->middleware(['role:admin,accountant']);
+    Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy'])->name('expenses.destroy')->middleware(['role:admin,accountant']);
+    
+    // Bills & Payables (Accountant & Admin)
+    Route::get('/expenses/unpaid', [ExpenseController::class, 'unpaidBills'])->name('expenses.unpaid')->middleware(['role:admin,accountant']);
+    Route::post('/expenses/{expense}/pay', [ExpenseController::class, 'payBill'])->name('expenses.pay')->middleware(['role:admin,accountant']);
+    
+    // Vendors (Accountant & Admin)
+    Route::resource('vendors', App\Http\Controllers\VendorController::class)->middleware(['role:admin,accountant']);
 
     // Shareholder Management (Accountant & Admin)
     Route::get('/accounting/shareholders', [AccountingController::class, 'indexShareholders'])->name('accounting.shareholders.index')->middleware('role:admin,accountant');

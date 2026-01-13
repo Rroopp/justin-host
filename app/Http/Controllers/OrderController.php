@@ -9,6 +9,7 @@ use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\InventoryService;
 
 class OrderController extends Controller
 {
@@ -187,10 +188,20 @@ class OrderController extends Controller
         if ($validated['status'] === 'received') {
             DB::beginTransaction();
             try {
+                $inventoryService = new InventoryService();
+                
                 foreach ($order->items as $item) {
                     $product = Inventory::find($item->product_id);
                     if ($product) {
-                        $product->increment('quantity_in_stock', $item->quantity);
+                        // Use Service to calculate WAC and create movement record
+                        $inventoryService->receiveStock(
+                            $product,
+                            $item->quantity,
+                            $item->unit_cost, // Crucial: Use actual PO cost
+                            'Purchase Order',
+                            "Received via PO #{$order->order_number}",
+                            $request->user()
+                        );
                     }
                 }
 
@@ -212,6 +223,62 @@ class OrderController extends Controller
         }
 
         return redirect()->back()->with('success', 'Order status updated');
+    }
+
+    /**
+     * Process payment for a Purchase Order
+     */
+    public function storePayment(Request $request, PurchaseOrder $order)
+    {
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01',
+            'payment_method' => 'required|string|in:Cash,Bank,M-Pesa,Cheque',
+        ]);
+
+        if ($order->status !== 'received' && $order->status !== 'approved') {
+             // You usually pay after receiving, or advance payment.
+             // Letting it slide for 'approved' (advance payment) or 'received'.
+        }
+
+        if ($order->payment_status === 'paid') {
+            if ($request->expectsJson()) {
+                return response()->json(['error' => 'Order is already fully paid'], 400);
+            }
+            return redirect()->back()->with('error', 'Order is already fully paid');
+        }
+
+        DB::beginTransaction();
+        try {
+            $newAmountPaid = $order->amount_paid + $validated['amount'];
+            
+            // Prevent overpayment?
+            if ($newAmountPaid > $order->total_amount) {
+                 // Warning or allow overpayment? Let's block for now.
+                 throw new \Exception("Payment amount exceeds outstanding balance.");
+            }
+
+            $order->amount_paid = $newAmountPaid;
+            $order->payment_status = ($newAmountPaid >= $order->total_amount) ? 'paid' : 'partial';
+            $order->save();
+
+            // Record Accounting Entry
+            $accounting = new \App\Services\AccountingService();
+            $accounting->recordPurchaseOrderPayment($order, $validated['amount'], $validated['payment_method'], $request->user());
+
+            DB::commit();
+
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'Payment recorded', 'order' => $order]);
+            }
+            return redirect()->back()->with('success', 'Payment recorded successfully');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            if ($request->expectsJson()) {
+                return response()->json(['error' => $e->getMessage()], 500);
+            }
+            return redirect()->back()->with('error', 'Payment failed: ' . $e->getMessage());
+        }
     }
 
     /**

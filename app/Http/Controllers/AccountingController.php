@@ -691,6 +691,7 @@ class AccountingController extends Controller
             'date' => 'required|date',
             'description' => 'required|string',
             'shareholder_id' => 'nullable|exists:shareholders,id',
+            'equity_account_id' => 'nullable|exists:chart_of_accounts,id',
         ]);
 
         $entry = $accountingService->recordCapitalInvestment(
@@ -699,7 +700,8 @@ class AccountingController extends Controller
             $validated['date'],
             $validated['description'],
             $request->user(),
-            $validated['shareholder_id'] ?? null
+            $validated['shareholder_id'] ?? null,
+            $validated['equity_account_id'] ?? null
         );
 
         if ($entry) {
@@ -715,6 +717,29 @@ class AccountingController extends Controller
 
     public function indexShareholders(Request $request)
     {
+        // Auto-seed default Asset accounts if none exist (User Experience improvement)
+        if (!ChartOfAccount::where('account_type', 'Asset')->exists()) {
+            ChartOfAccount::create([
+                'code' => '1000',
+                'name' => 'Cash Account',
+                'account_type' => 'Asset',
+                'description' => 'Default Cash Account',
+                'is_active' => true,
+            ]);
+            ChartOfAccount::create([
+                'code' => '1010',
+                'name' => 'Bank Account',
+                'account_type' => 'Asset',
+                'description' => 'Default Bank Account',
+                'is_active' => true,
+            ]);
+        }
+        
+        // Fetch accounts for the dropdown
+        $assetAccounts = ChartOfAccount::where('account_type', 'Asset')
+            ->where('is_active', true)
+            ->get();
+
         $shareholders = \App\Models\Shareholder::with('capitalAccount')->get();
         // Calculate current capital balance for each
         foreach ($shareholders as $shareholder) {
@@ -725,7 +750,7 @@ class AccountingController extends Controller
             return response()->json($shareholders);
         }
 
-        return view('accounting.shareholders.index', compact('shareholders'));
+        return view('accounting.shareholders.index', compact('shareholders', 'assetAccounts'));
     }
 
     public function storeShareholder(Request $request)
@@ -748,11 +773,14 @@ class AccountingController extends Controller
                 $capitalCode++;
             }
 
+            $accountingService = app(\App\Services\AccountingService::class);
+            $parent = $accountingService->getSystemParentAccount('Equity');
+
             $account = ChartOfAccount::create([
                 'code' => $capitalCode,
                 'name' => "Capital - {$validated['name']}",
                 'account_type' => 'Equity',
-                'parent_id' => null, // Or generic Owner Capital?
+                'parent_id' => $parent?->id,
                 'description' => "Capital account for shareholder {$validated['name']}",
                 'is_active' => true,
             ]);

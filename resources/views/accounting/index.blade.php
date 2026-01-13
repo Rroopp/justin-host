@@ -279,14 +279,24 @@
                         <p class="text-sm text-gray-500 mb-4">Inject money into the business from Owner/Capital to a Bank/Cash Account.</p>
                         <div class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700">Investor (Optional)</label>
+                                <label class="block text-sm font-medium text-gray-700">Source Account (Equity) *</label>
+                                <select name="equity_account_id" required class="mt-1 block w-full rounded-md border-gray-300">
+                                    <option value="">-- Select Equity Account --</option>
+                                    <template x-for="e in equityAccounts" :key="e.id">
+                                        <option :value="e.id" x-text="`${e.code} - ${e.name}`"></option>
+                                    </template>
+                                </select>
+                                <p class="text-xs text-gray-500 mt-1">E.g. Owner/Capital, Shareholder Contribution</p>
+                            </div>
+                            <!-- Shareholder link optional, mainly for tracking dividends -->
+                            <div class="mt-2">
+                                <label class="block text-sm font-medium text-gray-700">Specific Shareholder (Optional)</label>
                                 <select name="shareholder_id" class="mt-1 block w-full rounded-md border-gray-300">
-                                    <option value="">-- Generic Owner Investment --</option>
+                                    <option value="">-- None (General Capital) --</option>
                                     <template x-for="s in shareholders" :key="s.id">
                                         <option :value="s.id" x-text="s.name"></option>
                                     </template>
                                 </select>
-                                <p class="text-xs text-gray-500 mt-1">Select if money is coming from a specific shareholder.</p>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700">Amount (KSh) *</label>
@@ -329,6 +339,7 @@ window.accountingManager = function() {
     return {
         accounts: [],
         assets: [], // Dedicated list for dropdowns
+        equityAccounts: [], // Dedicated request list for capital modal
         shareholders: [],
         flatAccounts: [],
         selectedType: '',
@@ -373,20 +384,20 @@ window.accountingManager = function() {
 
         async loadShareholders() {
             try {
-                // We need a simple API to get list of shareholders for dropdown
-                // Since indexShareholders returns a view, currently we don't have a pure JSON endpoint for search?
-                // Actually, indexShareholders might return JSON if expectsJson?
-                // Let's assume we can fetch from existing route or we need to add a small one. 
-                // Wait, Controller's indexShareholders currently returns a VIEW.
-                // I should assume the modal is blade, but the data is alpine.
-                // I'll update the controller indexShareholders to return JSON if requested.
+                // Fetch shareholders
                 const response = await axios.get('/accounting/shareholders?format=json'); 
-                // But wait, the route returns a view. 
-                // I should verify controller logic first or add a check there.
-                // Assuming I will fix controller to support JSON.
                 this.shareholders = response.data;
             } catch (error) {
                 console.error('Error loading shareholders:', error);
+            }
+        },
+
+        async loadEquityAccounts() {
+            try {
+                const response = await axios.get('/accounting/chart-of-accounts?account_type=Equity&include_inactive=0');
+                this.equityAccounts = response.data;
+            } catch (error) {
+                console.error('Error loading equity accounts:', error);
             }
         },
 
@@ -455,6 +466,7 @@ window.accountingManager = function() {
         openCapitalModal() {
             this.loadAssets(); 
             this.loadShareholders();
+            this.loadEquityAccounts();
             this.showCapitalModal = true;
             this.showAddModal = false;
             this.showEditModal = false;

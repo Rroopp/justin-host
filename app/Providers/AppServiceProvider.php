@@ -19,6 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Event listener is auto-discovered
+        // \Illuminate\Support\Facades\Event::listen(
+        //     \App\Events\SaleCompleted::class,
+        //     \App\Listeners\AccountingListener::class,
+        // );
     }
 }

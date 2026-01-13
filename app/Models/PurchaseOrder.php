@@ -15,6 +15,8 @@ class PurchaseOrder extends Model
         'supplier_id',
         'supplier_name',
         'status',
+        'payment_status',
+        'amount_paid',
         'subtotal',
         'tax_amount',
         'total_amount',

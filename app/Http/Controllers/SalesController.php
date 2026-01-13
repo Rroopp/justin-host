@@ -84,7 +84,7 @@ class SalesController extends Controller
             return $this->streamCsv('sales_report.csv', ['Sale ID', 'Date', 'Customer', 'Amount', 'Paid', 'Status', 'Method', 'Items'], $data, 'Sales Report');
         }
 
-        $sales = $query->orderBy('created_at', 'desc')->paginate(50);
+        $sales = $query->with('refunds')->orderBy('created_at', 'desc')->paginate(50);
 
         if ($request->expectsJson()) {
             return response()->json($sales);
@@ -348,5 +348,104 @@ class SalesController extends Controller
          */ 
         $paymentController = new \App\Http\Controllers\PaymentController();
         return $paymentController->store($request, $sale->id);
+    }
+    /**
+     * Update payment method for an existing sale.
+     * Triggers accounting correction.
+     */
+    public function updatePaymentMethod(Request $request, PosSale $sale, \App\Services\AccountingService $accounting)
+    {
+        // 1. Authorization
+        if (!in_array($request->user()->role, ['admin', 'supervisor', 'accountant', 'staff'])) {
+            // Check ownership if staff
+            if ($sale->seller_username !== $request->user()->username) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
+
+        $request->validate([
+            'payment_method' => 'required|string',
+        ]);
+
+        $newMethod = $request->payment_method;
+        $oldMethod = $sale->payment_method;
+
+        if ($newMethod === $oldMethod) {
+            return response()->json(['message' => 'No change needed.']);
+        }
+
+        // 2. Perform Accounting Correction
+        // Log current state
+        \Illuminate\Support\Facades\Log::info("Updating Sale #{$sale->id} Payment Method: {$oldMethod} -> {$newMethod}");
+
+        $success = $accounting->correctSalePaymentMethod($sale, $oldMethod, $newMethod, $request->user());
+        
+        if (!$success) {
+            return response()->json(['message' => 'Failed to update accounting records.'], 500);
+        }
+
+        // 3. Update Sale Record Logic
+        // Hande Status Changes
+        if ($newMethod === 'Credit') {
+            // Moving to Credit -> Pending
+            $sale->payment_method = 'Credit';
+            $sale->payment_status = 'pending';
+            $sale->document_type = 'invoice';
+            
+            // Delete existing payments as they are now invalid/reversed
+            // Note: Journal entry reversal handled the accounting side. We just clean up the "Payment" record.
+            $sale->payments()->delete(); 
+            
+        } elseif (in_array($newMethod, ['Cash', 'M-Pesa', 'Bank', 'Cheque'])) {
+            // Moving to Immediate Payment -> Paid
+            $sale->payment_method = $newMethod;
+            $sale->payment_status = 'paid';
+            $sale->document_type = 'receipt';
+
+            // Create or Update Payment Record
+            // If previous was Credit, no payment record exists -> Create one.
+            // If previous was Cash/M-Pesa, a payment record likely exists -> Update it.
+            
+            $existingPayment = $sale->payments()->first();
+            
+            if ($existingPayment) {
+                $existingPayment->update([
+                    'payment_method' => $newMethod,
+                    'amount' => $sale->total // Ensure full amount is reflected
+                ]);
+            } else {
+                \App\Models\PosSalePayment::create([
+                    'pos_sale_id' => $sale->id,
+                    'amount' => $sale->total,
+                    'payment_method' => $newMethod,
+                    'payment_date' => now(),
+                    'reference' => 'Correction',
+                    'user_id' => $request->user()->id
+                ]);
+            }
+        } else {
+             // Fallback for custom methods (Treat as paid generally, or keep status if unknown)
+             // Default to paid for generic methods
+             $sale->payment_method = $newMethod;
+             if ($sale->payment_status !== 'paid') {
+                 $sale->payment_status = 'paid';
+                 $sale->document_type = 'receipt';
+                 \App\Models\PosSalePayment::create([
+                    'pos_sale_id' => $sale->id,
+                    'amount' => $sale->total,
+                    'payment_method' => $newMethod,
+                    'payment_date' => now(),
+                    'reference' => 'Correction',
+                    'user_id' => $request->user()->id
+                ]);
+             }
+        }
+
+        $sale->save();
+
+        return response()->json([
+            'message' => 'Payment method updated successfully',
+            'sale' => $sale
+        ]);
     }
 }

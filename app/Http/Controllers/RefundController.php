@@ -66,7 +66,18 @@ class RefundController extends Controller
             return redirect()->back()->with('error', 'Cannot refund unpaid sales.');
         }
 
-        return view('refunds.create', compact('sale'));
+        // Calculate already refunded amount (approved/completed only? or pending too? safely pending too to avoid double request)
+        $refundedAmount = $sale->refunds()
+            ->whereIn('status', ['pending', 'completed'])
+            ->sum('refund_amount');
+            
+        $refundableAmount = max($sale->total - $refundedAmount, 0);
+
+        if ($refundableAmount < 0.01) {
+             return redirect()->back()->with('error', 'Sale is already fully refunded.');
+        }
+
+        return view('refunds.create', compact('sale', 'refundedAmount', 'refundableAmount'));
     }
 
     /**
@@ -83,13 +94,54 @@ class RefundController extends Controller
             'refund_amount' => 'required|numeric|min:0.01',
             'reason' => 'required|string|min:10',
             'refund_method' => 'required|in:Cash,M-Pesa,Bank,Credit Note',
+                'refund_items.*.product_name' => 'nullable|string', // Allow it, but we'll override or ensure it exists
         ]);
 
         $sale = PosSale::findOrFail($saleId);
 
-        // Validate refund amount doesn't exceed sale total
-        if ($validated['refund_amount'] > $sale->total) {
-            return redirect()->back()->with('error', 'Refund amount cannot exceed sale total.');
+        // Calculate already refunded amount
+        $refundedTotal = $sale->refunds()
+            ->whereIn('status', ['pending', 'completed'])
+            ->sum('refund_amount');
+            
+        $maxRefundable = max($sale->total - $refundedTotal, 0);
+
+        // Validate refund amount doesn't exceed refundable balance
+        if ($validated['refund_amount'] > $maxRefundable + 0.01) { // 0.01 tolerance
+            return redirect()->back()->with('error', 'Refund amount cannot exceed remaining refundable balance (' . number_format($maxRefundable, 2) . ').');
+        }
+
+        // Enrich items with product details from DB to ensure accuracy
+        $enrichedItems = [];
+        foreach ($validated['refund_items'] as $item) {
+            $productName = $item['product_name'] ?? 'Unknown Product';
+            
+            // Try to fetch real name from inventory if product_id exists
+            if (!empty($item['product_id'])) {
+                $inventory = Inventory::find($item['product_id']);
+                if ($inventory) {
+                    $productName = $inventory->product_name;
+                }
+            }
+            
+            $item['product_name'] = $productName;
+            $enrichedItems[] = $item;
+        }
+
+        // Validate Total Calculation
+        // Ensuring the refund amount closely matches the item values (consistency check)
+        $calculatedTotal = 0;
+        foreach ($enrichedItems as $item) {
+            $qty = $item['quantity'] ?? 0;
+            $price = $item['unit_price'] ?? 0;
+            $calculatedTotal += $qty * $price;
+        }
+
+        // Allow a small float tolerance (e.g. 0.05) or strict check?
+        // Let's rely on strict equality if possible, or generous tolerance if rounding is tricky.
+        // User asked to "make sure they tally", suggesting strictness.
+        if (abs($calculatedTotal - $validated['refund_amount']) > 0.1) {
+            return redirect()->back()->with('error', "Refund Amount (" . number_format($validated['refund_amount'], 2) . ") does not tally with the selected items total (" . number_format($calculatedTotal, 2) . ").");
         }
 
         DB::beginTransaction();
@@ -100,7 +152,7 @@ class RefundController extends Controller
                 'refund_type' => $validated['refund_type'],
                 'status' => 'pending',
                 'refund_amount' => $validated['refund_amount'],
-                'refund_items' => $validated['refund_items'],
+                'refund_items' => $enrichedItems,
                 'reason' => $validated['reason'],
                 'requested_by' => auth()->user()->staff->id ?? null,
                 'refund_method' => $validated['refund_method'],

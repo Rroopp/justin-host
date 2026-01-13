@@ -9,6 +9,11 @@
                 <p class="mt-2 text-sm text-gray-600">Manage products and stock levels</p>
             </div>
             <div class="flex gap-2">
+                <button @click="$refs.importFile.click()" class="bg-green-100 text-green-700 px-4 py-2 rounded-md hover:bg-green-200">
+                    Import CSV
+                </button>
+                <input type="file" x-ref="importFile" @change="importInventory($event)" class="hidden" accept=".csv">
+                
                 <button @click="exportInventory()" class="bg-indigo-100 text-indigo-700 px-4 py-2 rounded-md hover:bg-indigo-200">
                     Export CSV
                 </button>
@@ -893,6 +898,30 @@ window.inventoryManager = function() {
             params.append('export', 'true');
             
             window.location.href = `/inventory?${params.toString()}`;
+        },
+
+        async importInventory(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            this.loading = true;
+            try {
+                const response = await axios.post('/inventory/import', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                alert('Import successful! ' + response.data.details.success + ' items imported.');
+                this.loadInventory();
+                this.loadCategories();
+            } catch (error) {
+                console.error('Import failed:', error);
+                alert('Import failed: ' + (error.response?.data?.error || error.response?.data?.message || 'Unknown error'));
+            } finally {
+                this.loading = false;
+                event.target.value = ''; // Reset input to allow re-selecting same file
+            }
         },
 
         async loadCategories() {

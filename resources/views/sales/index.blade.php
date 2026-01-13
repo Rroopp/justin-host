@@ -61,7 +61,7 @@
         </div>
 
         <!-- Sales Table -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-md">
+        <div class="bg-white shadow sm:rounded-md">
             <div x-show="loading" class="p-8 text-center">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
             </div>
@@ -104,89 +104,100 @@
                                     }"
                                     x-text="sale.payment_status"
                                 ></span>
+                                
+                                <!-- Refund Status Badge -->
+                                <template x-if="getRefundStatus(sale)">
+                                    <span 
+                                        class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ml-1"
+                                        :class="{
+                                            'bg-red-100 text-red-800': getRefundStatus(sale) === 'Fully Refunded',
+                                            'bg-orange-100 text-orange-800': getRefundStatus(sale) === 'Partially Refunded'
+                                        }"
+                                        x-text="getRefundStatus(sale)"
+                                    ></span>
+                                </template>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <div class="flex flex-col items-end gap-2">
-                                    <!-- Documents - Conditional based on payment method -->
-                                    <template x-if="['Cash', 'M-Pesa', 'Cheque', 'Bank'].includes(sale.payment_method)">
-                                        <!-- Cash/Immediate Payment: Only Receipt -->
-                                        <a :href="`/receipts/${sale.id}/print?type=receipt`" target="_blank" class="inline-flex items-center text-indigo-600 hover:text-indigo-900">
-                                            <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                                            </svg>
-                                            Receipt
-                                        </a>
-                                    </template>
+                                <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+                                    <button @click="open = !open" type="button" class="text-gray-400 hover:text-gray-600 focus:outline-none">
+                                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                        </svg>
+                                    </button>
                                     
-                                    <template x-if="['Credit', 'Consignment'].includes(sale.payment_method)">
-                                        <!-- Credit/Consignment: Documents Dropdown (No Receipt until paid) -->
-                                        <div class="relative" x-data="{ open: false }" @click.outside="open = false">
-                                            <button @click="open = !open" type="button" class="inline-flex items-center text-indigo-600 hover:text-indigo-900">
-                                                <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                                </svg>
-                                                Documents
-                                                <svg class="ml-1 h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                                </svg>
-                                            </button>
-                                            <div x-show="open" 
-                                                 x-transition
-                                                 class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50"
-                                                 style="display: none;">
-                                                <div class="py-1">
+                                    <div x-show="open" 
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         class="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 z-50"
+                                         style="display: none;">
+                                        
+                                        <!-- Documents Section -->
+                                        <div class="py-1">
+                                            <template x-if="['Cash', 'M-Pesa', 'Cheque', 'Bank'].includes(sale.payment_method)">
+                                                <a :href="`/receipts/${sale.id}/print?type=receipt`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                    Download Receipt
+                                                </a>
+                                            </template>
+                                            
+                                            <template x-if="['Credit', 'Consignment'].includes(sale.payment_method)">
+                                                <div>
                                                     <a :href="`/receipts/${sale.id}/print?type=invoice`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                        <svg class="inline mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                        </svg>
-                                                        Invoice
+                                                        Download Invoice
                                                     </a>
-                                                    <!-- Receipt only when fully paid -->
+                                                    <a :href="`/receipts/${sale.id}/print?type=delivery_note`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                        Download Delivery Note
+                                                    </a>
                                                     <template x-if="['paid', 'Paid', 'PAID'].includes(sale.payment_status)">
-                                                        <a :href="`/receipts/${sale.id}/print?type=receipt`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                            <svg class="inline mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                                                            </svg>
-                                                            Receipt
+                                                        <a :href="`/receipts/${sale.id}/print?type=receipt`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-green-600">
+                                                            Download Receipt
                                                         </a>
                                                     </template>
-                                                    <a :href="`/receipts/${sale.id}/print?type=delivery_note`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                        <svg class="inline mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                                                        </svg>
-                                                        Delivery Note
-                                                    </a>
-                                                    <a :href="`/receipts/${sale.id}/print?type=packing_slip`" target="_blank" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                                        <svg class="inline mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                                                        </svg>
-                                                        Packing Slip
-                                                    </a>
                                                 </div>
-                                            </div>
+                                            </template>
                                         </div>
-                                    </template>
-                                    
-                                    <button
-                                        type="button"
-                                        x-show="!['paid', 'Paid', 'PAID'].includes(sale.payment_status) && sale.document_type === 'invoice'"
-                                        @click="openPaymentModal(sale)"
-                                        class="text-green-600 hover:text-green-900"
-                                    >
-                                        Record Payment
-                                    </button>
-                                    @if(auth()->user()->hasRole('admin'))
-                                    <button type="button" @click="openCommissionModal(sale)" class="text-xs text-yellow-600 hover:text-yellow-900 border border-yellow-200 bg-yellow-50 px-2 py-0.5 rounded">
-                                        + Commission
-                                    </button>
-                                    @endif
-                                    
-                                    <!-- Request Refund Button -->
-                                    @if(auth()->user()->hasRole(['admin', 'staff', 'accountant']))
-                                    <a :href="`/sales/${sale.id}/refund`" class="text-xs text-red-600 hover:text-red-900 border border-red-200 bg-red-50 px-2 py-0.5 rounded">
-                                        Request Refund
-                                    </a>
-                                    @endif
+
+                                        <!-- Actions Section -->
+                                        <div class="py-1">
+                                            <!-- Record Payment -->
+                                            <button
+                                                type="button"
+                                                x-show="!['paid', 'Paid', 'PAID'].includes(sale.payment_status) && sale.document_type === 'invoice'"
+                                                @click="openPaymentModal(sale); open = false"
+                                                class="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-gray-100"
+                                            >
+                                                Record Payment
+                                            </button>
+
+                                            <!-- Edit Payment Method -->
+                                            <button 
+                                                type="button" 
+                                                @click.stop="openEditPaymentModal(sale); open = false" 
+                                                class="w-full text-left px-4 py-2 text-sm text-blue-600 hover:bg-gray-100"
+                                            >
+                                                Correct Payment Method
+                                            </button>
+
+                                            <!-- Commission -->
+                                            @if(auth()->user()->hasRole('admin'))
+                                            <button type="button" @click="openCommissionModal(sale); open = false" class="w-full text-left px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100">
+                                                Add Commission
+                                            </button>
+                                            @endif
+                                            
+                                            <!-- Request Refund -->
+                                            @if(auth()->user()->hasRole(['admin', 'staff', 'accountant']))
+                                            <template x-if="getRefundStatus(sale) !== 'Fully Refunded'">
+                                                <a :href="`/sales/${sale.id}/refund`" class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                                                    Request Refund
+                                                </a>
+                                            </template>
+                                            @endif
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -329,6 +340,51 @@
             </div>
         </div>
     </div>
+
+    <!-- Edit Payment Method Modal -->
+    <!-- Edit Payment Method Modal -->
+    <!-- Edit Payment Method Modal -->
+    <template x-teleport="body">
+    <div x-show="showEditPaymentModal" class="fixed inset-0 overflow-y-auto" style="z-index: 10000;" x-cloak>
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity" style="z-index: 100;" @click="showEditPaymentModal = false">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative" style="z-index: 101;">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Edit Payment Method</h3>
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-500">
+                            Correcting payment method for Sale #<span x-text="editPaymentForm.invoice_number"></span>.
+                            <br>
+                            <span class="text-red-500 font-bold">Warning:</span> This will adjust accounting records and may update the payment status.
+                        </p>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">New Payment Method</label>
+                        <select x-model="editPaymentForm.payment_method" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="Cash">Cash</option>
+                            <option value="M-Pesa">M-Pesa</option>
+                            <option value="Bank">Bank</option>
+                            <option value="Cheque">Cheque</option>
+                            <option value="Credit">Credit (Pay Later)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse gap-2">
+                    <button type="button" @click="submitEditPaymentMethod()" :disabled="processingEditPayment" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm disabled:opacity-50">
+                        <span x-show="!processingEditPayment">Update Method</span>
+                        <span x-show="processingEditPayment">Updating...</span>
+                    </button>
+                    <button type="button" @click="showEditPaymentModal = false" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </template>
 </div>
 
 <script>
@@ -367,6 +423,15 @@ window.salesManager = function() {
             type: 'sale',
             description: '',
             invoice_number: ''
+        },
+
+        // Edit Payment Modal State
+        showEditPaymentModal: false,
+        processingEditPayment: false,
+        editPaymentForm: {
+            id: null,
+            invoice_number: '',
+            payment_method: ''
         },
 
         init() {
@@ -414,6 +479,35 @@ window.salesManager = function() {
                  alert('Error adding commission: ' + (error.response?.data?.message || JSON.stringify(error.response?.data) || error.message));
             } finally {
                 this.processingCommission = false;
+            }
+        },
+
+        openEditPaymentModal(sale) {
+            console.log('openEditPaymentModal called', sale);
+            if (!sale) return;
+
+            // Simple assignment to internal form state
+            this.editPaymentForm.id = sale.id;
+            this.editPaymentForm.invoice_number = sale.invoice_number || sale.id;
+            this.editPaymentForm.payment_method = sale.payment_method;
+            
+            console.log('Setting showEditPaymentModal to true');
+            this.showEditPaymentModal = true;
+        },
+
+        async submitEditPaymentMethod() {
+            this.processingEditPayment = true;
+            try {
+                await axios.post(`/sales/${this.editPaymentForm.id}/update-payment-method`, {
+                    payment_method: this.editPaymentForm.payment_method
+                });
+                alert('Payment method updated successfully.');
+                this.showEditPaymentModal = false;
+                this.loadSales();
+            } catch (error) {
+                alert('Error updating payment method: ' + (error.response?.data?.message || error.message));
+            } finally {
+                this.processingEditPayment = false;
             }
         },
 
@@ -525,6 +619,22 @@ window.salesManager = function() {
             if (!dateString) return '';
             const date = new Date(dateString);
             return date.toLocaleDateString('en-KE') + ' ' + date.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+        },
+
+        getRefundStatus(sale) {
+            if (!sale.refunds || sale.refunds.length === 0) return null;
+            
+            // Only count approved/completed refunds
+            const refundedAmount = sale.refunds
+                .filter(r => r.status === 'completed')
+                .reduce((sum, r) => sum + parseFloat(r.refund_amount), 0);
+            
+            if (refundedAmount >= parseFloat(sale.total) - 0.1) { // 0.1 tolerance
+                return 'Fully Refunded';
+            } else if (refundedAmount > 0) {
+                return 'Partially Refunded';
+            }
+            return null;
         }
     }
 }

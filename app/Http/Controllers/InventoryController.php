@@ -10,7 +10,9 @@ use App\Models\Asset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Schema;
 use App\Services\AccountingService;
+use App\Services\InventoryService;
 
 class InventoryController extends Controller
 {
@@ -351,25 +353,23 @@ class InventoryController extends Controller
 
         DB::beginTransaction();
         try {
-            $oldQuantity = $inventory->quantity_in_stock;
-            $newQuantity = $oldQuantity + $validated['quantity'];
+            // 1. & 2. Receive Stock (Updates Qty + WAC + Audit Trail)
+            $inventoryService = new InventoryService();
+            // Assuming manual restock implies current buying price unless specified (future improvement: add cost input)
+            $unitCost = $inventory->price; 
+            
+            $adjustment = $inventoryService->receiveStock(
+                $inventory,
+                $validated['quantity'],
+                $unitCost,
+                'Restock',
+                $validated['notes'] ?? 'Manual Restock',
+                $request->user()
+            );
 
-            // 1. Create Adjustment Record (Audit Trail)
-            $adjustment = InventoryAdjustment::create([
-                'inventory_id' => $inventory->id,
-                'staff_id' => $request->user()->id ?? null, // Assuming link to staff via user
-                'adjustment_type' => 'increase',
-                'quantity' => $validated['quantity'],
-                'old_quantity' => $oldQuantity,
-                'new_quantity' => $newQuantity,
-                'reason' => 'Restock',
-                'notes' => $validated['notes'] ?? 'Manual Restock',
-            ]);
-
-            // 2. Update Inventory
-            $inventory->increment('quantity_in_stock', $validated['quantity']);
-
-            // 3. Trigger Accounting (Dr Inventory, Cr COGS/Equity)
+            // 3. Trigger Accounting (Dr Inventory, Cr COGS/Equity/AP)
+            // Note: If we paid cash, this should be Cr Cash. If it's just "found" stock, Cr Equity/Income.
+            // For now, keeping existing logic but passing the adjustment.
             $accounting = new AccountingService();
             $accounting->recordInventoryAdjustment($adjustment, $request->user());
 

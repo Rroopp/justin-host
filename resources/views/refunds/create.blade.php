@@ -34,10 +34,22 @@
                             <dt class="text-sm font-medium text-gray-500">Payment Method</dt>
                             <dd class="text-sm text-gray-900">{{ $sale->payment_method }}</dd>
                         </div>
+                        @if($refundedAmount > 0)
+                        <div class="col-span-2 mt-2 pt-2 border-t flex gap-6">
+                            <div>
+                                <dt class="text-xs font-medium text-gray-500 uppercase">Already Refunded</dt>
+                                <dd class="text-sm font-bold text-orange-600">{{ settings('currency_symbol', 'KSh') }} {{ number_format($refundedAmount, 2) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-xs font-medium text-gray-500 uppercase">Remaining Refundable</dt>
+                                <dd class="text-sm font-bold text-green-600">{{ settings('currency_symbol', 'KSh') }} {{ number_format($refundableAmount, 2) }}</dd>
+                            </div>
+                        </div>
+                        @endif
                     </dl>
                 </div>
 
-                <form action="{{ route('refunds.store', $sale->id) }}" method="POST">
+                <form action="{{ route('refunds.store', $sale->id) }}" method="POST" @submit="validateForm($event)">
                     @csrf
 
                     <!-- Refund Type -->
@@ -45,64 +57,64 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">Refund Type</label>
                         <div class="flex gap-4">
                             <label class="inline-flex items-center">
-                                <input type="radio" name="refund_type" value="full" x-model="refundType" class="form-radio" checked>
+                                <input type="radio" name="refund_type" value="full" x-model="refundType" @change="calculateTotal" class="form-radio">
                                 <span class="ml-2">Full Refund</span>
                             </label>
                             <label class="inline-flex items-center">
-                                <input type="radio" name="refund_type" value="partial" x-model="refundType" class="form-radio">
+                                <input type="radio" name="refund_type" value="partial" x-model="refundType" @change="calculateTotal" class="form-radio">
                                 <span class="ml-2">Partial Refund</span>
                             </label>
                         </div>
                     </div>
 
                     <!-- Items Selection -->
-                    <div class="mb-6">
+                    <div class="mb-6" x-show="refundType === 'partial'">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Select Items to Refund</label>
                         <div class="border rounded-md divide-y">
-                            @foreach($sale->sale_items as $index => $item)
-                                <div class="p-4" x-data="{ selected: true, quantity: {{ $item['quantity'] }} }">
+                            <template x-for="(item, index) in items" :key="index">
+                                <div class="p-4" :class="{ 'bg-blue-50': item.selected }">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center flex-1">
                                             <input type="checkbox" 
-                                                   x-model="selected"
-                                                   @change="updateRefundAmount()"
+                                                   x-model="item.selected"
+                                                   @change="calculateTotal"
                                                    class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                                             <div class="ml-3 flex-1">
-                                                <p class="text-sm font-medium text-gray-900">{{ $item['product_name'] }}</p>
+                                                <p class="text-sm font-medium text-gray-900" x-text="item.product_name"></p>
                                                 <p class="text-sm text-gray-500">
-                                                    Original Qty: {{ $item['quantity'] }} × {{ settings('currency_symbol', 'KSh') }} {{ number_format($item['unit_price'], 2) }}
+                                                    Original Qty: <span x-text="item.original_quantity"></span> × {{ settings('currency_symbol', 'KSh') }} <span x-text="item.unit_price"></span>
                                                 </p>
                                             </div>
                                         </div>
 
-                                        <div class="ml-4" x-show="selected && refundType === 'partial'">
+                                        <div class="ml-4" x-show="item.selected">
                                             <label class="text-xs text-gray-500">Refund Qty</label>
                                             <input type="number" 
-                                                   x-model="quantity"
-                                                   @input="updateRefundAmount()"
+                                                   x-model="item.refund_quantity"
+                                                   @input="calculateTotal"
                                                    min="0.01" 
-                                                   :max="{{ $item['quantity'] }}"
+                                                   :max="item.original_quantity"
                                                    step="0.01"
                                                    class="w-20 rounded-md border-gray-300 text-sm">
                                         </div>
 
                                         <div class="ml-4 text-right">
-                                            <p class="text-sm font-medium text-gray-900" x-text="'{{ settings('currency_symbol', 'KSh') }} ' + (selected ? (quantity * {{ $item['unit_price'] }}).toFixed(2) : '0.00')"></p>
+                                            <p class="text-sm font-medium text-gray-900" x-text="'{{ settings('currency_symbol', 'KSh') }} ' + (item.selected ? (item.refund_quantity * item.unit_price).toFixed(2) : '0.00')"></p>
                                         </div>
                                     </div>
 
-                                    <!-- Hidden inputs for selected items -->
-                                    <template x-if="selected">
+                                    <!-- Hidden inputs for validation/backend -->
+                                    <template x-if="item.selected || refundType === 'full'">
                                         <div>
-                                            <input type="hidden" :name="'refund_items[' + {{ $index }} + '][product_id]'" value="{{ $item['product_id'] ?? $item['id'] }}">
-                                            <input type="hidden" :name="'refund_items[' + {{ $index }} + '][product_name]'" value="{{ $item['product_name'] }}">
-                                            <input type="hidden" :name="'refund_items[' + {{ $index }} + '][quantity]'" :value="quantity">
-                                            <input type="hidden" :name="'refund_items[' + {{ $index }} + '][unit_price]'" value="{{ $item['unit_price'] }}">
-                                            <input type="hidden" :name="'refund_items[' + {{ $index }} + '][type]'" value="{{ $item['type'] ?? 'sale' }}">
+                                            <input type="hidden" :name="'refund_items[' + index + '][product_id]'" :value="item.product_id">
+                                            <input type="hidden" :name="'refund_items[' + index + '][product_name]'" :value="item.product_name">
+                                            <input type="hidden" :name="'refund_items[' + index + '][quantity]'" :value="item.refund_quantity">
+                                            <input type="hidden" :name="'refund_items[' + index + '][unit_price]'" :value="item.unit_price">
+                                            <input type="hidden" :name="'refund_items[' + index + '][type]'" :value="item.type">
                                         </div>
                                     </template>
                                 </div>
-                            @endforeach
+                            </template>
                         </div>
                     </div>
 
@@ -114,13 +126,21 @@
                             <input type="number" 
                                    name="refund_amount" 
                                    x-model="refundAmount"
+                                   :readonly="refundType === 'partial'"
+                                   :class="refundType === 'partial' ? 'bg-gray-100' : 'bg-white'"
                                    step="0.01" 
                                    min="0.01"
-                                   max="{{ $sale->total }}"
+                                   step="0.01" 
+                                   min="0.01"
+                                   max="{{ $refundableAmount }}"
+                                   required
                                    required
                                    class="pl-12 w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                         </div>
-                        <p class="mt-1 text-sm text-gray-500">Maximum: {{ settings('currency_symbol', 'KSh') }} {{ number_format($sale->total, 2) }}</p>
+                        <p class="mt-1 text-sm text-gray-500">
+                            <span x-show="refundType === 'full'">Total Sale Amount</span>
+                            <span x-show="refundType === 'partial'">Calculated based on selected items</span>
+                        </p>
                     </div>
 
                     <!-- Refund Method -->
@@ -164,12 +184,57 @@
 <script>
 function refundForm() {
     return {
-        refundType: 'full',
-        refundAmount: {{ $sale->total }},
+        refundType: 'full', // Defaults to full remaining
+        refundAmount: {{ $refundableAmount }},
+        saleTotal: {{ $sale->total }},
+        maxRefundable: {{ $refundableAmount }},
+        items: [
+            @foreach($sale->sale_items as $item)
+            {
+                product_id: '{{ $item['product_id'] ?? $item['id'] }}',
+                product_name: '{{ addslashes($item['product_name']) }}',
+                original_quantity: {{ $item['quantity'] }},
+                refund_quantity: {{ $item['quantity'] }},
+                unit_price: {{ $item['unit_price'] }},
+                type: '{{ $item['type'] ?? 'sale' }}',
+                selected: true
+            },
+            @endforeach
+        ],
         
-        updateRefundAmount() {
-            // This would calculate based on selected items
-            // For now, keeping it simple
+        init() {
+            this.calculateTotal();
+        },
+
+        calculateTotal() {
+            if (this.refundType === 'full') {
+                this.refundAmount = this.maxRefundable;
+                // For 'full' remaining, we ideally return all *remaining* items, but logic is complex if partial items were returned.
+                // For now, simplistically select all for UI visual, but backend handles amount.
+                // Actually, if partial previously done, 'Full Remaining' might not map 1:1 to all items.
+                // Let's just set the amount and let backend handle the accounting reversal amount.
+                this.items.forEach(i => i.selected = true); 
+            } else {
+                let total = 0;
+                this.items.forEach(item => {
+                    if (item.selected) {
+                        let qty = parseFloat(item.refund_quantity) || 0;
+                        if (qty > item.original_quantity) {
+                            qty = item.original_quantity; // Cap at max
+                            item.refund_quantity = qty;
+                        }
+                        total += qty * item.unit_price;
+                    }
+                });
+                this.refundAmount = parseFloat(total.toFixed(2));
+            }
+        },
+
+        validateForm(e) {
+            if (this.refundType === 'partial' && this.items.filter(i => i.selected).length === 0) {
+                e.preventDefault();
+                alert('Please select at least one item to refund for Partial Refund.');
+            }
         }
     }
 }

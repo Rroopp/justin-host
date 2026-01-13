@@ -9,6 +9,17 @@ class Inventory extends Model
 {
     use HasFactory, SoftDeletes, Auditable;
     protected $table = 'inventory_master';
+    
+    protected static function booted()
+    {
+        static::creating(function ($inventory) {
+            if (empty($inventory->code)) {
+                $inventory->code = 'INV-' . strtoupper(\Illuminate\Support\Str::random(8));
+                // Ensure uniqueness could be added here if needed, but random(8) is fairly collision resistant for small scale
+            }
+        });
+    }
+
     protected $fillable = [
         'product_name',
         'category',
@@ -33,6 +44,7 @@ class Inventory extends Model
         'manufacturer',
         'description',
         'attributes',
+        'moving_average_cost', // New field
     ];
     protected $casts = [
         'quantity_in_stock' => 'integer',
@@ -44,6 +56,7 @@ class Inventory extends Model
         'price' => 'decimal:2',
         'selling_price' => 'decimal:2',
         'profit' => 'decimal:2',
+        'moving_average_cost' => 'decimal:2', // New field
         'attributes' => 'array',
     /**
      * Check if stock is low

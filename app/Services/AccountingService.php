@@ -273,12 +273,111 @@ class AccountingService
     }
 
     /**
+     * Ensure critical default accounts exist.
+     * Self-healing method to prevent transaction failures on fresh installs.
+     */
+    public function ensureDefaultAccountsExist()
+    {
+        // 1. Create Root Accounts (Categories)
+        $roots = [
+            'Asset' => ['code' => '100', 'name' => 'Assets'],
+            'Liability' => ['code' => '200', 'name' => 'Liabilities'],
+            'Equity' => ['code' => '300', 'name' => 'Equity'],
+            'Income' => ['code' => '400', 'name' => 'Income'],
+            'Expense' => ['code' => '500', 'name' => 'Expenses'],
+        ];
+
+        $rootMap = [];
+        foreach ($roots as $type => $data) {
+            $root = ChartOfAccount::firstOrCreate(
+                ['code' => $data['code']],
+                [
+                    'name' => $data['name'],
+                    'account_type' => $type,
+                    'parent_id' => null,
+                    'is_active' => true,
+                    'description' => "System Root Account for {$type}"
+                ]
+            );
+            $rootMap[$type] = $root->id;
+        }
+
+        // 2. Default Operational Accounts
+        $accounts = [
+            // ASSETS
+            ['code' => self::ACCOUNT_CASH, 'name' => 'Cash on Hand', 'account_type' => 'Asset'],
+            ['code' => self::ACCOUNT_BANK, 'name' => 'Bank Account', 'account_type' => 'Asset'],
+            ['code' => self::ACCOUNT_INVENTORY, 'name' => 'Inventory', 'account_type' => 'Asset'],
+            ['code' => self::ACCOUNT_ACCOUNTS_RECEIVABLE, 'name' => 'Accounts Receivable', 'account_type' => 'Asset'],
+
+            // LIABILITIES
+            ['code' => self::ACCOUNT_VAT_LIABILITY, 'name' => 'VAT Payable', 'account_type' => 'Liability'],
+            ['code' => self::ACCOUNT_ACCOUNTS_PAYABLE, 'name' => 'Accounts Payable', 'account_type' => 'Liability'],
+            ['code' => self::ACCOUNT_COMMISSIONS_PAYABLE, 'name' => 'Commissions Payable', 'account_type' => 'Liability'],
+
+            // EQUITY
+            ['code' => self::ACCOUNT_CAPITAL, 'name' => 'Owner/Capital', 'account_type' => 'Equity'],
+            ['code' => self::ACCOUNT_RETAINED_EARNINGS, 'name' => 'Retained Earnings', 'account_type' => 'Equity'],
+
+            // INCOME
+            ['code' => self::ACCOUNT_REVENUE, 'name' => 'Sales Revenue', 'account_type' => 'Income'],
+            ['code' => self::ACCOUNT_OTHER_INCOME, 'name' => 'Other Income', 'account_type' => 'Income'],
+
+            // EXPENSES
+            ['code' => self::ACCOUNT_COGS, 'name' => 'Cost of Goods Sold (COGS)', 'account_type' => 'Expense'],
+            ['code' => self::ACCOUNT_SALARIES, 'name' => 'Salaries & Wages', 'account_type' => 'Expense'],
+            ['code' => self::ACCOUNT_COMMISSION_EXPENSE, 'name' => 'Commission Expense', 'account_type' => 'Expense'],
+        ];
+
+        foreach ($accounts as $acc) {
+            ChartOfAccount::firstOrCreate(
+                ['code' => $acc['code']],
+                [
+                    'name' => $acc['name'],
+                    'account_type' => $acc['account_type'],
+                    'parent_id' => $rootMap[$acc['account_type']] ?? null,
+                    'is_active' => true,
+                    'description' => 'System created default account',
+                ]
+            );
+        }
+    }
+
+    /**
+     * Helper to get the System Root Parent for a type
+     */
+    public function getSystemParentAccount($type)
+    {
+        // Ensure roots exist first
+        if (!ChartOfAccount::where('code', '100')->exists()) {
+            $this->ensureDefaultAccountsExist();
+        }
+
+        $code = match($type) {
+            'Asset' => '100',
+            'Liability' => '200',
+            'Equity' => '300',
+            'Income' => '400',
+            'Expense' => '500',
+            default => null
+        };
+
+        if ($code) {
+            return ChartOfAccount::where('code', $code)->first();
+        }
+        return null;
+    }
+
+    /**
      * Record accounting entry for a POS Sale
      * Handles: Cost of Goods Sold (Dr COGS, Cr Inventory)
      *          Revenue (Dr Cash/Bank/AR, Cr Revenue, Cr VAT)
      */
     public function recordSale($sale, $user = null)
     {
+        // 0. Self-heal: Ensure accounts exist
+        $this->ensureDefaultAccountsExist();
+
         // 1. Identify Necessary Accounts
         $inventoryAccount = ChartOfAccount::where('code', self::ACCOUNT_INVENTORY)->first();
         $cogsAccount = ChartOfAccount::where('code', self::ACCOUNT_COGS)->first();
@@ -492,6 +591,77 @@ class AccountingService
     }
 
     /**
+     * Record accounting entry for a Purchase Order Payment
+     * Handles: Dr Accounts Payable, Cr Cash/Bank
+     */
+    public function recordPurchaseOrderPayment(\App\Models\PurchaseOrder $order, $amount, $paymentMethod, $user = null)
+    {
+        // 1. Identify Accounts
+        $apAccount = ChartOfAccount::where('code', self::ACCOUNT_ACCOUNTS_PAYABLE)->first();
+        
+        // Use helper method for payment account mapping
+        $assetAccount = $this->getPaymentAccount($paymentMethod ?? 'cash');
+
+        // Fallback to cash if still null
+        if (!$assetAccount) {
+            $assetAccount = ChartOfAccount::where('code', self::ACCOUNT_CASH)->first();
+        }
+
+        if (!$apAccount || !$assetAccount) {
+            Log::warning('AccountingService: Missing accounts for PO Payment.');
+            return null;
+        }
+
+        // Check Period Lock
+        if (!$this->checkPeriodStatus(now())) {
+            return null;
+        }
+
+        DB::beginTransaction();
+        try {
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber(now()),
+                'entry_date' => now(),
+                'description' => "Payment for PO #{$order->order_number} to {$order->supplier_name}",
+                'reference_type' => 'PURCHASE_ORDER_PAYMENT',
+                'reference_id' => $order->id,
+                'total_debit' => $amount,
+                'total_credit' => $amount,
+                'status' => 'POSTED',
+                'created_by' => $user ? $user->username : 'system',
+            ]);
+
+            // Dr Accounts Payable (Liability Decrease)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $apAccount->id,
+                'debit_amount' => $amount,
+                'credit_amount' => 0,
+                'description' => "Payment to {$order->supplier_name}",
+                'line_number' => 1,
+            ]);
+
+            // Cr Asset (Cash/Bank Decrease)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $assetAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $amount,
+                'description' => "Paid via {$paymentMethod}",
+                'line_number' => 2,
+            ]);
+
+            DB::commit();
+            return $entry;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("AccountingService: Failed to record PO Payment #{$order->id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Record accounting entry for an Invoice Payment
      * Handles: Dr Cash/Bank, Cr Accounts Receivable
      */
@@ -561,11 +731,15 @@ class AccountingService
      * Record Capital Investment (Owner Injection)
      * Debit: Bank/Cash, Credit: Equity (Capital)
      */
-    public function recordCapitalInvestment($amount, $accountId, $date, $description, $user = null, $shareholderId = null)
+    public function recordCapitalInvestment($amount, $accountId, $date, $description, $user = null, $shareholderId = null, $specificEquityAccountId = null)
     {
         $capitalAccount = null;
 
-        if ($shareholderId) {
+        if ($specificEquityAccountId) {
+            $capitalAccount = ChartOfAccount::find($specificEquityAccountId);
+        }
+
+        if (!$capitalAccount && $shareholderId) {
             $shareholder = \App\Models\Shareholder::find($shareholderId);
             if ($shareholder && $shareholder->capital_account_id) {
                 $capitalAccount = ChartOfAccount::find($shareholder->capital_account_id);
@@ -638,19 +812,25 @@ class AccountingService
 
         // Auto-create accounts if missing
         if (!$expenseAccount) {
+            $parent = $this->getSystemParentAccount('Expense');
+            
             $expenseAccount = ChartOfAccount::create([
                 'code' => self::ACCOUNT_COMMISSION_EXPENSE,
                 'name' => 'Commission Expense',
                 'account_type' => 'Expense',
+                'parent_id' => $parent?->id,
                 'is_active' => true,
                 'description' => 'Staff commissions'
             ]);
         }
         if (!$payableAccount) {
+            $parent = $this->getSystemParentAccount('Liability');
+
             $payableAccount = ChartOfAccount::create([
                 'code' => self::ACCOUNT_COMMISSIONS_PAYABLE,
                 'name' => 'Commissions Payable',
                 'account_type' => 'Liability',
+                'parent_id' => $parent?->id,
                 'is_active' => true,
                 'description' => 'Unpaid staff commissions'
             ]);
@@ -729,22 +909,58 @@ class AccountingService
      */
     private function getPaymentAccount($paymentMethod)
     {
-        $method = strtolower(trim($paymentMethod));
+        $method = trim($paymentMethod); // Keep original case for name if needed
+        $normalized = strtolower($method);
         
-        // Map payment methods to account codes
-        $accountCode = match($method) {
+        // Map common payment methods to default account codes
+        $accountCode = match($normalized) {
             'cash', 'cash on delivery' => self::ACCOUNT_CASH,
             'm-pesa', 'mpesa' => self::ACCOUNT_MPESA,
             'cheque', 'check' => self::ACCOUNT_CHEQUE,
-            'bank', 'bank transfer', 'transfer', 'card', 'credit card', 'debit card' => self::ACCOUNT_BANK,
-            default => self::ACCOUNT_BANK, // Fallback to bank
+            // 'bank' etc maps to explicit bank, but "Equity Bank" should not map to "Bank 1010" implicitly unless we want it to.
+            // Let's keep specific generic terms mapping to default Bank
+            'bank', 'bank transfer', 'transfer' => self::ACCOUNT_BANK,
+            default => null, // No default code mapping
         };
         
-        $account = ChartOfAccount::where('code', $accountCode)->first();
+        $account = null;
         
-        // Auto-create if missing (for M-Pesa and Cheque)
-        if (!$account && in_array($accountCode, [self::ACCOUNT_MPESA, self::ACCOUNT_CHEQUE])) {
-            $account = $this->createPaymentAccount($accountCode);
+        if ($accountCode) {
+            $account = ChartOfAccount::where('code', $accountCode)->first();
+            // Auto-create simplified defaults if missing
+            if (!$account && in_array($accountCode, [self::ACCOUNT_MPESA, self::ACCOUNT_CHEQUE])) {
+                $account = $this->createPaymentAccount($accountCode);
+            }
+        }
+        
+        // If still no account found (either not in map, or mapped but db missing), try dynamic lookup/create
+        if (!$account) {
+            // 1. Try finding by name (Case insensitive)
+            $account = ChartOfAccount::where(DB::raw('LOWER(name)'), $normalized)->first();
+            
+            // 2. If not found, Create it!
+            if (!$account) {
+                // Generate a pseudo-random code or next available code? 
+                // For simplicity, we'll try to find a code range. 
+                // Assets usually 1000-1999. Let's use 1100+ for Custom
+                
+                // Simple hash code or just random for now to avoid collision logic overhead in this snippet
+                $code = '11' . rand(10, 99); 
+                while(ChartOfAccount::where('code', $code)->exists()) {
+                    $code = '11' . rand(10, 99) . rand(0,9);
+                }
+
+                $parent = $this->getSystemParentAccount('Asset');
+
+                $account = ChartOfAccount::create([
+                    'code' => $code,
+                    'name' => ucwords($method), // Use original casing
+                    'account_type' => 'Asset',
+                    'parent_id' => $parent?->id,
+                    'is_active' => true,
+                    'description' => "Auto-created account for payment method: {$method}"
+                ]);
+            }
         }
         
         return $account;
@@ -758,16 +974,20 @@ class AccountingService
         $accountDetails = [
             self::ACCOUNT_MPESA => ['name' => 'M-Pesa', 'description' => 'M-Pesa mobile money payments'],
             self::ACCOUNT_CHEQUE => ['name' => 'Cheques Receivable', 'description' => 'Uncleared cheques'],
+            self::ACCOUNT_CASH => ['name' => 'Cash Account', 'description' => 'Cash on hand'],
         ];
         
         if (!isset($accountDetails[$accountCode])) {
             return null;
         }
         
+        $parent = $this->getSystemParentAccount('Asset');
+        
         return ChartOfAccount::create([
             'code' => $accountCode,
             'name' => $accountDetails[$accountCode]['name'],
             'account_type' => 'Asset',
+            'parent_id' => $parent?->id,
             'is_active' => true,
             'description' => $accountDetails[$accountCode]['description']
         ]);
@@ -787,12 +1007,13 @@ class AccountingService
         $retainedEarningsAccount = ChartOfAccount::where('code', self::ACCOUNT_RETAINED_EARNINGS)->first();
         
         if (!$retainedEarningsAccount) {
-            $capitalAccount = ChartOfAccount::where('code', self::ACCOUNT_CAPITAL)->first();
+            $parent = $this->getSystemParentAccount('Equity');
+
             $retainedEarningsAccount = ChartOfAccount::create([
                 'code' => self::ACCOUNT_RETAINED_EARNINGS,
                 'name' => 'Retained Earnings',
                 'account_type' => 'Equity',
-                'parent_id' => $capitalAccount?->id,
+                'parent_id' => $parent?->id,
                 'is_active' => true,
                 'description' => 'Accumulated profits retained in the business'
             ]);
@@ -1078,4 +1299,507 @@ class AccountingService
             return null;
         }
     }
+    /**
+     * Correct the payment method for a sale (Mistake reversal).
+     * This moves the asset from the old account to the new account (or AR).
+     */
+    public function correctSalePaymentMethod($sale, $oldMethod, $newMethod, $user = null)
+    {
+        $saleTotal = $sale->total;
+        $arAccount = ChartOfAccount::where('code', self::ACCOUNT_ACCOUNTS_RECEIVABLE)->first();
+
+        // 1. Determine "Old" Asset Account (Where money was)
+        $oldIsCredit = ($oldMethod === 'Credit');
+        $oldAccount = null;
+        if ($oldIsCredit) {
+            $oldAccount = $arAccount;
+        } else {
+            $oldAccount = $this->getPaymentAccount($oldMethod) ?? ChartOfAccount::where('code', self::ACCOUNT_CASH)->first();
+        }
+
+        // 2. Determine "New" Asset Account (Where money should be)
+        $newIsCredit = ($newMethod === 'Credit');
+        $newAccount = null;
+        if ($newIsCredit) {
+            $newAccount = $arAccount;
+        } else {
+            $newAccount = $this->getPaymentAccount($newMethod);
+            if (!$newAccount) {
+                 // Fallback to Cash if not found/mapped
+                 $newAccount = ChartOfAccount::where('code', self::ACCOUNT_CASH)->first();
+            }
+        }
+
+        if (!$oldAccount || !$newAccount) {
+            Log::error("AccountingService: Cannot correct payment method. Missing accounts.");
+            return false;
+        }
+
+        if ($oldAccount->id === $newAccount->id) {
+            return true; // No accounting change needed
+        }
+
+        DB::beginTransaction();
+        try {
+            // 3. Create Correction Journal Entry
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber(now()),
+                'entry_date' => now(),
+                'description' => "Correction: Change Payment from {$oldMethod} to {$newMethod} (Sale #{$sale->invoice_number})",
+                'reference_type' => 'SALE_CORRECTION',
+                'reference_id' => $sale->id,
+                'total_debit' => $saleTotal,
+                'total_credit' => $saleTotal,
+                'status' => 'POSTED',
+                'created_by' => $user ? $user->username : 'system',
+            ]);
+
+            // Debit New Account (Increase)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $newAccount->id,
+                'debit_amount' => $saleTotal,
+                'credit_amount' => 0,
+                'description' => "Transfer to {$newMethod}",
+                'line_number' => 1,
+            ]);
+
+            // Credit Old Account (Decrease/Reverse)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $oldAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $saleTotal,
+                'description' => "Reversal from {$oldMethod}",
+                'line_number' => 2,
+            ]);
+
+            DB::commit();
+            return true;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("AccountingService: Correction failed: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Record a Direct Expense (Paid Immediately)
+     * Dr Expense Account / Cr Bank/Cash
+     * 
+     * @param Expense $expense - The expense record with status='paid'
+     * @param mixed $user
+     * @return JournalEntry|null
+     */
+    public function recordDirectExpense(Expense $expense, $user = null)
+    {
+        $expenseAccount = $expense->category;
+        $paymentAccount = $expense->paymentAccount;
+
+        if (!$expenseAccount || !$paymentAccount) {
+            Log::warning('AccountingService: Missing accounts for Direct Expense recording.');
+            return null;
+        }
+
+        DB::beginTransaction();
+        try {
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber($expense->expense_date),
+                'entry_date' => $expense->expense_date,
+                'description' => "Expense: {$expense->description} - {$expense->payee}",
+                'reference_type' => 'EXPENSE',
+                'reference_id' => $expense->id,
+                'total_debit' => $expense->amount,
+                'total_credit' => $expense->amount,
+                'status' => 'POSTED',
+                'created_by' => $user ? $user->username : 'system',
+            ]);
+
+            // Dr Expense (Increase)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $expenseAccount->id,
+                'debit_amount' => $expense->amount,
+                'credit_amount' => 0,
+                'description' => $expense->description,
+                'line_number' => 1,
+            ]);
+
+            // Cr Payment Account (Asset Decrease)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $paymentAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $expense->amount,
+                'description' => "Payment to {$expense->payee}",
+                'line_number' => 2,
+            ]);
+
+            DB::commit();
+            return $entry;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("AccountingService: Failed to record Direct Expense #{$expense->id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Record a Bill (Unpaid Expense)
+     * Dr Expense Account / Cr Accounts Payable
+     * 
+     * @param Expense $expense - The expense record with status='unpaid'
+     * @param mixed $user
+     * @return JournalEntry|null
+     */
+    public function recordBill(Expense $expense, $user = null)
+    {
+        // Get Accounts Payable
+        $apAccount = ChartOfAccount::where('code', self::ACCOUNT_ACCOUNTS_PAYABLE)->first();
+        
+        // Get Expense Category Account
+        $expenseAccount = $expense->category;
+
+        if (!$apAccount || !$expenseAccount) {
+            Log::warning('AccountingService: Missing accounts for Bill recording (AP or Expense Category).');
+            return null;
+        }
+
+        DB::beginTransaction();
+        try {
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber($expense->expense_date),
+                'entry_date' => $expense->expense_date,
+                'description' => "Bill: {$expense->description} - {$expense->payee}" . ($expense->reference_number ? " (Ref: {$expense->reference_number})" : ""),
+                'reference_type' => 'EXPENSE_BILL',
+                'reference_id' => $expense->id,
+                'total_debit' => $expense->amount,
+                'total_credit' => $expense->amount,
+                'status' => 'POSTED',
+                'created_by' => $user ? $user->username : 'system',
+            ]);
+
+            // Dr Expense (Increase)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $expenseAccount->id,
+                'debit_amount' => $expense->amount,
+                'credit_amount' => 0,
+                'description' => $expense->description,
+                'line_number' => 1,
+            ]);
+
+            // Cr Accounts Payable (Liability Increase)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $apAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $expense->amount,
+                'description' => "Payable to {$expense->payee}",
+                'line_number' => 2,
+            ]);
+
+            DB::commit();
+            return $entry;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("AccountingService: Failed to record Bill #{$expense->id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Pay a Bill (Full or Partial)
+     * Dr Accounts Payable / Cr Bank/Cash
+     * 
+     * @param Expense $expense - The bill being paid
+     * @param float $amount - Amount being paid
+     * @param int $sourceAccountId - Payment source (Bank, Cash, etc.)
+     * @param mixed $user
+     * @return JournalEntry|null
+     */
+    public function payBill(Expense $expense, float $amount, int $sourceAccountId, $user = null)
+    {
+        $apAccount = ChartOfAccount::where('code', self::ACCOUNT_ACCOUNTS_PAYABLE)->first();
+        $sourceAccount = ChartOfAccount::find($sourceAccountId);
+
+        if (!$apAccount || !$sourceAccount) {
+            Log::warning('AccountingService: Missing accounts for Bill Payment.');
+            return null;
+        }
+
+        DB::beginTransaction();
+        try {
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber(now()),
+                'entry_date' => now(),
+                'description' => "Payment for Bill: {$expense->description} - {$expense->payee}",
+                'reference_type' => 'BILL_PAYMENT',
+                'reference_id' => $expense->id,
+                'total_debit' => $amount,
+                'total_credit' => $amount,
+                'status' => 'POSTED',
+                'created_by' => $user ? $user->username : 'system',
+            ]);
+
+            // Dr Accounts Payable (Liability Decrease)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $apAccount->id,
+                'debit_amount' => $amount,
+                'credit_amount' => 0,
+                'description' => "Payment to {$expense->payee}",
+                'line_number' => 1,
+            ]);
+
+            // Cr Source Account (Asset Decrease)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $sourceAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $amount,
+                'description' => "Payment via {$sourceAccount->name}",
+                'line_number' => 2,
+            ]);
+
+            DB::commit();
+            return $entry;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("AccountingService: Failed to pay Bill #{$expense->id}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Record Inter-Account Transfer
+     * Dr Destination Account / Cr Source Account
+     * 
+     * @param int $fromAccountId - Source account
+     * @param int $toAccountId - Destination account
+     * @param float $amount - Transfer amount
+     * @param string $description - Transfer description
+     * @param mixed $user
+     * @return JournalEntry|null
+     */
+    public function recordTransfer(int $fromAccountId, int $toAccountId, float $amount, string $description = 'Fund Transfer', $user = null)
+    {
+        $fromAccount = ChartOfAccount::find($fromAccountId);
+        $toAccount = ChartOfAccount::find($toAccountId);
+
+        if (!$fromAccount || !$toAccount) {
+            Log::warning('AccountingService: Invalid accounts for transfer.');
+            return null;
+        }
+
+        if ($fromAccountId === $toAccountId) {
+            Log::warning('AccountingService: Cannot transfer to same account.');
+            return null;
+        }
+
+        DB::beginTransaction();
+        try {
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber(now()),
+                'entry_date' => now(),
+                'description' => $description,
+                'reference_type' => 'TRANSFER',
+                'reference_id' => null,
+                'total_debit' => $amount,
+                'total_credit' => $amount,
+                'status' => 'POSTED',
+                'created_by' => $user ? $user->username : 'system',
+            ]);
+
+            // Dr Destination (Increase)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $toAccount->id,
+                'debit_amount' => $amount,
+                'credit_amount' => 0,
+                'description' => "Transfer from {$fromAccount->name}",
+                'line_number' => 1,
+            ]);
+
+            // Cr Source (Decrease)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $fromAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $amount,
+                'description' => "Transfer to {$toAccount->name}",
+                'line_number' => 2,
+            ]);
+
+            DB::commit();
+            return $entry;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("AccountingService: Failed to record transfer: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Checks if the accounting period for a given date is open.
+     *
+     * @param \DateTime|string $date
+     * @return bool
+     */
+    protected function checkPeriodStatus($date): bool
+    {
+        if (\App\Models\AccountingPeriod::isDateClosed($date)) {
+            $formattedDate = \Carbon\Carbon::parse($date)->format('Y-m-d');
+            Log::warning("AccountingService: Attempted to post to Closed Period for date {$formattedDate}.");
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Post Journal Entries for a completed POS Sale (Revenue + COGS)
+     */
+    public function postSaleJournal(\App\Models\PosSale $sale)
+    {
+        // Assuming the user intended to add the import at the top of the file.
+        // The provided snippet was syntactically incorrect for an import within the method signature.
+        // Also, the instruction mentioned calling `checkPeriodStatus` in `recordJournalEntry`,
+        // but `recordJournalEntry` is not present. I'm adding a call here as a placeholder
+        // for where such a check might be relevant, assuming it was a general instruction
+        // to use the new method.
+
+        // Check if the accounting period is open for the sale date
+        if (!$this->checkPeriodStatus($sale->created_at)) {
+            Log::error("AccountingService: Cannot post sale #{$sale->id}. Accounting period is not open.");
+            return;
+        }
+
+        DB::transaction(function () use ($sale) {
+            // 1. Identify Accounts
+            $revenueAccount = ChartOfAccount::where('code', self::ACCOUNT_REVENUE)->first();
+            $vatAccount = ChartOfAccount::where('code', self::ACCOUNT_VAT_LIABILITY)->first();
+            $cogsAccount = ChartOfAccount::where('code', self::ACCOUNT_COGS)->first();
+            $inventoryAccount = ChartOfAccount::where('code', self::ACCOUNT_INVENTORY)->first();
+            
+            // Determine Debit Account (Cash/Bank/AR)
+            $debitAccount = $this->getPaymentAccount($sale->payment_method);
+
+            if (!$revenueAccount || !$debitAccount) {
+                Log::error("AccountingService: Missing accounts for Sale #{$sale->id}");
+                return;
+            }
+
+            // 2. REVENUE ENTRY (Dr Asset / Cr Revenue / Cr VAT)
+            $entry = JournalEntry::create([
+                'entry_number' => JournalEntry::generateEntryNumber($sale->created_at),
+                'entry_date' => $sale->created_at,
+                'description' => "POS Sale #{$sale->invoice_number} ({$sale->customer_name})",
+                'reference_type' => 'SALE',
+                'reference_id' => $sale->id,
+                'total_debit' => $sale->total,
+                'total_credit' => $sale->total,
+                'status' => 'POSTED',
+                'created_by' => 'system',
+            ]);
+
+            // Dr Asset (Cash/Bank)
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $debitAccount->id,
+                'debit_amount' => $sale->total,
+                'credit_amount' => 0,
+                'description' => "Payment via {$sale->payment_method}",
+                'line_number' => 1,
+            ]);
+
+            // Cr VAT (if applicable)
+            // Use explicit VAT from DB
+            $revenueToPost = $sale->total - $sale->vat; // Total collected - Tax collected
+
+            if ($sale->vat > 0 && $vatAccount) {
+                JournalEntryLine::create([
+                    'journal_entry_id' => $entry->id,
+                    'account_id' => $vatAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $sale->vat,
+                    'description' => 'VAT Liability (16%)',
+                    'line_number' => 2,
+                ]);
+            }
+
+            // Cr Revenue
+            JournalEntryLine::create([
+                'journal_entry_id' => $entry->id,
+                'account_id' => $revenueAccount->id,
+                'debit_amount' => 0,
+                'credit_amount' => $revenueToPost,
+                'description' => 'Sales Revenue',
+                'line_number' => 3,
+            ]);
+
+
+            // 3. COGS ENTRY (Dr COGS / Cr Inventory)
+            // Calculate Total Cost
+            $totalCost = 0;
+            if (is_array($sale->sale_items)) {
+                foreach ($sale->sale_items as $item) {
+                    $qty = $item['quantity'] ?? 0;
+                    // Try to get cost from snapshot (historical)
+                    $wac = $item['product_snapshot']['moving_average_cost'] ?? 0;
+                    $buyingPrice = $item['product_snapshot']['price'] ?? 0;
+                    $costPrice = ($wac > 0) ? $wac : $buyingPrice;
+                    
+                    // If snapshot is missing data, try fetching current (Not ideal, but fallback)
+                    if ($costPrice == 0 && !empty($item['product_id'])) {
+                        $product = \App\Models\Inventory::find($item['product_id']);
+                        if ($product) {
+                            $costPrice = ($product->moving_average_cost > 0) ? $product->moving_average_cost : $product->price;
+                        }
+                    }
+
+                    $totalCost += ($costPrice * $qty);
+                }
+            }
+
+            if ($totalCost > 0 && $cogsAccount && $inventoryAccount) {
+                $cogsEntry = JournalEntry::create([
+                    'entry_number' => JournalEntry::generateEntryNumber($sale->created_at) . '-COGS',
+                    'entry_date' => $sale->created_at,
+                    'description' => "COGS for Sale #{$sale->invoice_number}",
+                    'reference_type' => 'SALE_COGS',
+                    'reference_id' => $sale->id,
+                    'total_debit' => $totalCost,
+                    'total_credit' => $totalCost,
+                    'status' => 'POSTED',
+                    'created_by' => 'system',
+                ]);
+
+                // Dr COGS
+                JournalEntryLine::create([
+                    'journal_entry_id' => $cogsEntry->id,
+                    'account_id' => $cogsAccount->id,
+                    'debit_amount' => $totalCost,
+                    'credit_amount' => 0,
+                    'description' => 'Cost of Goods Sold',
+                    'line_number' => 1,
+                ]);
+
+                // Cr Inventory
+                JournalEntryLine::create([
+                    'journal_entry_id' => $cogsEntry->id,
+                    'account_id' => $inventoryAccount->id,
+                    'debit_amount' => 0,
+                    'credit_amount' => $totalCost,
+                    'description' => 'Inventory Asset Reduction',
+                    'line_number' => 2,
+                ]);
+            }
+        });
+    }
+
 }

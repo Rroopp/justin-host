@@ -87,4 +87,9 @@ class PosSale extends Model
     {
         return $this->hasMany(Commission::class, 'pos_sale_id');
     }
+
+    public function refunds()
+    {
+        return $this->hasMany(Refund::class, 'pos_sale_id');
+    }
 }

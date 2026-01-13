@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\InventoryImportController;
 use App\Http\Controllers\POSController;
 use App\Http\Controllers\SalesController;
 use App\Http\Controllers\CustomerController;
@@ -24,6 +25,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/inventory/low-stock-alerts', [InventoryController::class, 'lowStockAlerts'])->middleware('role:admin');
     Route::get('/inventory/types', [InventoryController::class, 'getTypes'])->middleware('role:admin,staff');
     Route::get('/inventory/sizes', [InventoryController::class, 'getSizes'])->middleware('role:admin,staff');
+    Route::post('/inventory/import', [InventoryImportController::class, '__invoke'])->middleware('role:admin');
     
     // Inventory actions (parameterized)
     Route::post('/inventory', [InventoryController::class, 'store'])->middleware('role:admin,staff');

@@ -76,9 +76,6 @@ class ExpenseController extends Controller
         return view('expenses.index', compact('expenses', 'categories', 'paymentAccounts'));
     }
 
-    /**
-     * Store a newly created expense.
-     */
     public function store(Request $request, \App\Services\AccountingService $accountingService)
     {
         $validated = $request->validate([
@@ -86,9 +83,12 @@ class ExpenseController extends Controller
             'description' => 'required|string',
             'amount' => 'required|numeric|min:0',
             'expense_date' => 'required|date',
-            'category_id' => 'nullable|exists:chart_of_accounts,id',
+            'category_id' => 'required|exists:chart_of_accounts,id',
             'payment_account_id' => 'nullable|exists:chart_of_accounts,id',
-            'create_journal_entry' => 'boolean',
+            'vendor_id' => 'nullable|exists:vendors,id',
+            'status' => 'required|in:paid,unpaid',
+            'due_date' => 'nullable|date',
+            'reference_number' => 'nullable|string|max:255',
         ]);
 
         DB::beginTransaction();
@@ -98,14 +98,24 @@ class ExpenseController extends Controller
                 'description' => $validated['description'],
                 'amount' => $validated['amount'],
                 'expense_date' => $validated['expense_date'],
-                'category_id' => $validated['category_id'] ?? null,
+                'category_id' => $validated['category_id'],
                 'payment_account_id' => $validated['payment_account_id'] ?? null,
+                'vendor_id' => $validated['vendor_id'] ?? null,
+                'status' => $validated['status'],
+                'due_date' => $validated['due_date'] ?? null,
+                'reference_number' => $validated['reference_number'] ?? null,
                 'created_by' => $request->user() ? $request->user()->username : 'system',
             ]);
 
-            // Dictionary-based automation: Always record if accounts are present
-            if ($expense->category_id && $expense->payment_account_id) {
-                $accountingService->recordExpense($expense, $request->user());
+            // Record accounting entry based on status
+            if ($validated['status'] === 'unpaid') {
+                // Record as Bill (Dr Expense / Cr Accounts Payable)
+                $accountingService->recordBill($expense, $request->user());
+            } else {
+                // Record as Direct Expense (Dr Expense / Cr Bank/Cash)
+                if ($expense->payment_account_id) {
+                    $accountingService->recordDirectExpense($expense, $request->user());
+                }
             }
 
             DB::commit();
@@ -114,15 +124,16 @@ class ExpenseController extends Controller
                 return response()->json($expense, 201);
             }
 
-            return redirect()->route('expenses.index')->with('success', 'Expense recorded successfully');
+            return redirect()->route('expenses.index')->with('success', 
+                $validated['status'] === 'unpaid' ? 'Bill recorded successfully' : 'Expense recorded successfully');
         } catch (\Exception $e) {
             DB::rollBack();
             
             if ($request->expectsJson()) {
-                return response()->json(['error' => 'Failed to record expense: ' . $e->getMessage()], 500);
+                return response()->json(['error' => 'Failed to record: ' . $e->getMessage()], 500);
             }
 
-            return redirect()->back()->with('error', 'Failed to record expense: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to record: ' . $e->getMessage());
         }
     }
 
@@ -166,6 +177,63 @@ class ExpenseController extends Controller
         }
 
         return redirect()->route('expenses.index')->with('success', 'Expense deleted successfully');
+    }
+
+
+    /**
+     * Display unpaid bills
+     */
+    public function unpaidBills(Request $request)
+    {
+        $bills = Expense::with('category', 'vendor')
+            ->where('status', 'unpaid')
+            ->orderBy('due_date', 'asc')
+            ->paginate(50);
+
+        $paymentAccounts = ChartOfAccount::whereIn('account_type', ['Asset'])
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        return view('expenses.unpaid', compact('bills', 'paymentAccounts'));
+    }
+
+    /**
+     * Pay a bill (full or partial)
+     */
+    public function payBill(Request $request, Expense $expense, \App\Services\AccountingService $accountingService)
+    {
+        if ($expense->status === 'paid') {
+            return redirect()->back()->with('error', 'Bill is already paid.');
+        }
+
+        $validated = $request->validate([
+            'amount' => 'required|numeric|min:0.01|max:' . $expense->amount,
+            'payment_account_id' => 'required|exists:chart_of_accounts,id',
+            'payment_date' => 'required|date',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Record payment in accounting
+            $accountingService->payBill($expense, $validated['amount'], $validated['payment_account_id'], $request->user());
+
+            // Update expense status
+            if ($validated['amount'] >= $expense->amount) {
+                $expense->status = 'paid';
+                $expense->payment_account_id = $validated['payment_account_id'];
+            } else {
+                $expense->status = 'partial';
+            }
+            $expense->save();
+
+            DB::commit();
+
+            return redirect()->route('expenses.unpaid')->with('success', 'Bill payment recorded successfully.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return redirect()->back()->with('error', 'Failed to record payment: ' . $e->getMessage());
+        }
     }
 
     /**
