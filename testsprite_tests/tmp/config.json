@@ -1,0 +1,29 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:8000",
+  "loginUser": "Rop",
+  "loginPassword": "@Kipkosgei.21",
+  "executionArgs": {
+    "projectName": "justin-host-main",
+    "projectPath": "c:\\Users\\kim\\OneDrive\\Desktop\\justin-host-main\\justin-host-main",
+    "testIds": [
+      "TC_EXP_003",
+      "TC_EXP_004",
+      "TC_EXP_005",
+      "TC_EXP_006",
+      "TC_EXP_007",
+      "TC_EXP_008",
+      "TC_EXP_009",
+      "TC_EXP_010",
+      "TC_EXP_011",
+      "TC_EXP_012"
+    ],
+    "additionalInstruction": "IMPORTANT: Use credentials username: 'Rop', password: '@Kipkosgei.21'. Ensure date pickers are handled robustly. For receipts, use a placeholder.",
+    "envs": {
+      "API_KEY": "sk-user-QMUg3iOUrPNGWXnmOj0Rrx0GvzOpC6F9cdLw3ScK9SqcWjgaI8dgjIi5UOpMqPO4kguGQX7GttXfAoxntcnSF8q6gnPLMHTxliIsryBeKqEbPtKj4mQmGxvs2KICEA42r_A"
+    }
+  },
+  "proxy": "http://aa2e6dd5-372f-46ab-a4af-0d3978017083:mzc14uKifYLQFyFwyQqzAkcX8r53lPO2@tun.testsprite.com:8080"
+}

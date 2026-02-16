@@ -1,0 +1,7 @@
+[
+  {
+    "id": "TC001",
+    "title": "home_page_access",
+    "description": "Verify that the home page of the hospital POS system is accessible and loads successfully, confirming the system is running."
+  }
+]

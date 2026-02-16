@@ -1,0 +1,288 @@
+{
+    "tech_stack": [
+        "PHP 8.x",
+        "Laravel 11",
+        "SQLite",
+        "Vite",
+        "TailwindCSS 4.0",
+        "Alpine.js 3.13",
+        "Chart.js 4.4",
+        "Axios"
+    ],
+    "features": [
+        {
+            "name": "Authentication & Authorization",
+            "description": "User login, logout, role-based access control (admin, staff, accountant)",
+            "files": [
+                "app/Http/Controllers/AuthController.php",
+                "resources/views/auth/login.blade.php",
+                "routes/web.php"
+            ]
+        },
+        {
+            "name": "Dashboard",
+            "description": "Main dashboard with overview of key metrics and system status",
+            "files": [
+                "app/Http/Controllers/DashboardController.php",
+                "resources/views/dashboard/index.blade.php"
+            ]
+        },
+        {
+            "name": "Point of Sale (POS)",
+            "description": "Complete POS system for sales transactions, cart management, receipt printing",
+            "files": [
+                "app/Http/Controllers/POSController.php",
+                "app/Models/PosSale.php",
+                "app/Models/PosSalePayment.php",
+                "resources/views/pos/index.blade.php",
+                "resources/views/pos/receipt.blade.php"
+            ]
+        },
+        {
+            "name": "Inventory Management",
+            "description": "Product inventory tracking, stock adjustments, categories, low stock alerts, health monitoring",
+            "files": [
+                "app/Http/Controllers/InventoryController.php",
+                "app/Http/Controllers/InventoryAdjustmentController.php",
+                "app/Http/Controllers/InventoryHealthController.php",
+                "app/Models/Inventory.php",
+                "app/Models/InventoryAdjustment.php",
+                "resources/views/inventory/index.blade.php",
+                "resources/views/inventory/categories.blade.php",
+                "resources/views/inventory/health.blade.php"
+            ]
+        },
+        {
+            "name": "Sales Management",
+            "description": "Sales tracking, invoices, consignments, payment processing, sales summaries",
+            "files": [
+                "app/Http/Controllers/SalesController.php",
+                "app/Models/Sale.php",
+                "resources/views/sales/index.blade.php",
+                "resources/views/sales/invoices/index.blade.php",
+                "resources/views/sales/consignments/index.blade.php"
+            ]
+        },
+        {
+            "name": "Purchase Orders & LPOs",
+            "description": "Local Purchase Orders management, supplier ordering, order tracking",
+            "files": [
+                "app/Http/Controllers/LpoController.php",
+                "app/Http/Controllers/OrderController.php",
+                "app/Models/Lpo.php",
+                "app/Models/PurchaseOrder.php",
+                "resources/views/lpos/index.blade.php",
+                "resources/views/lpos/create.blade.php",
+                "resources/views/orders/index.blade.php"
+            ]
+        },
+        {
+            "name": "Customer Management",
+            "description": "Customer database, package pricing, customer-specific LPOs",
+            "files": [
+                "app/Http/Controllers/CustomerController.php",
+                "app/Models/Customer.php",
+                "app/Models/CustomerPackagePricing.php",
+                "resources/views/customers/index.blade.php"
+            ]
+        },
+        {
+            "name": "Supplier Management",
+            "description": "Supplier database, supplier reports, vendor management",
+            "files": [
+                "app/Http/Controllers/SupplierController.php",
+                "app/Http/Controllers/VendorController.php",
+                "app/Models/Supplier.php",
+                "resources/views/suppliers/index.blade.php"
+            ]
+        },
+        {
+            "name": "Accounting System",
+            "description": "Chart of accounts, journal entries, trial balance, ledger, financial statements, aging reports, cash flow",
+            "files": [
+                "app/Http/Controllers/AccountingController.php",
+                "app/Models/ChartOfAccount.php",
+                "app/Models/JournalEntry.php",
+                "app/Models/JournalEntryLine.php",
+                "resources/views/accounting/index.blade.php",
+                "resources/views/accounting/trial-balance.blade.php",
+                "resources/views/accounting/ledger.blade.php",
+                "resources/views/accounting/financial-statements.blade.php"
+            ]
+        },
+        {
+            "name": "Payroll Management",
+            "description": "Employee payroll processing, earnings, deductions, contributions, payroll runs",
+            "files": [
+                "app/Http/Controllers/PayrollController.php",
+                "app/Models/PayrollRun.php",
+                "app/Models/PayrollItem.php",
+                "app/Models/PayrollEarning.php",
+                "app/Models/PayrollDeduction.php",
+                "resources/views/payroll/index.blade.php",
+                "resources/views/payroll/create.blade.php"
+            ]
+        },
+        {
+            "name": "Staff Management",
+            "description": "Staff database, activity logs, suspensions, reinstatements, recurring deductions",
+            "files": [
+                "app/Http/Controllers/StaffController.php",
+                "app/Models/Staff.php",
+                "app/Models/StaffActivityLog.php",
+                "resources/views/staff/index.blade.php"
+            ]
+        },
+        {
+            "name": "Expense Tracking",
+            "description": "Business expense management, unpaid expenses tracking",
+            "files": [
+                "app/Http/Controllers/ExpenseController.php",
+                "app/Models/Expense.php",
+                "resources/views/expenses/index.blade.php",
+                "resources/views/expenses/unpaid.blade.php"
+            ]
+        },
+        {
+            "name": "Budget Management",
+            "description": "Budget creation, tracking, forecasting, budget line items, dashboard",
+            "files": [
+                "app/Http/Controllers/BudgetController.php",
+                "app/Models/Budget.php",
+                "app/Models/BudgetLineItem.php",
+                "app/Models/BudgetForecast.php",
+                "resources/views/budgets/index.blade.php",
+                "resources/views/budgets/dashboard.blade.php"
+            ]
+        },
+        {
+            "name": "Stock Management",
+            "description": "Stock takes, stock transfers between locations, stock reconciliation",
+            "files": [
+                "app/Http/Controllers/StockTakeController.php",
+                "app/Http/Controllers/StockTransferController.php",
+                "app/Models/StockTake.php",
+                "app/Models/StockTransfer.php",
+                "resources/views/stock-takes/index.blade.php",
+                "resources/views/stock_transfers/index.blade.php"
+            ]
+        },
+        {
+            "name": "Rentals Management",
+            "description": "Equipment/item rental tracking, rental returns, rental items",
+            "files": [
+                "app/Http/Controllers/RentalController.php",
+                "app/Models/Rental.php",
+                "app/Models/RentalItem.php",
+                "resources/views/rentals/index.blade.php",
+                "resources/views/rentals/return.blade.php"
+            ]
+        },
+        {
+            "name": "Refunds Management",
+            "description": "Product refund processing and tracking",
+            "files": [
+                "app/Http/Controllers/RefundController.php",
+                "app/Models/Refund.php",
+                "resources/views/refunds/index.blade.php",
+                "resources/views/refunds/create.blade.php"
+            ]
+        },
+        {
+            "name": "Asset Management",
+            "description": "Fixed asset tracking and management",
+            "files": [
+                "app/Http/Controllers/AssetController.php",
+                "app/Models/Asset.php",
+                "resources/views/assets/index.blade.php"
+            ]
+        },
+        {
+            "name": "Package Management",
+            "description": "Product packages, package items, package pricing",
+            "files": [
+                "app/Http/Controllers/PackageController.php",
+                "app/Models/Package.php",
+                "app/Models/PackageItem.php",
+                "resources/views/packages/index.blade.php"
+            ]
+        },
+        {
+            "name": "Surgery Usage Tracking",
+            "description": "Medical supplies usage during surgeries, set contents management",
+            "files": [
+                "app/Http/Controllers/SurgeryUsageController.php",
+                "app/Http/Controllers/SetController.php",
+                "app/Models/SetContent.php",
+                "resources/views/surgery_usage/index.blade.php",
+                "resources/views/sets/index.blade.php"
+            ]
+        },
+        {
+            "name": "Banking Integration",
+            "description": "Banking transactions and reconciliation",
+            "files": [
+                "app/Http/Controllers/BankingController.php",
+                "resources/views/banking/index.blade.php"
+            ]
+        },
+        {
+            "name": "Commission Tracking",
+            "description": "Sales commission calculation and tracking",
+            "files": [
+                "app/Http/Controllers/CommissionController.php",
+                "app/Models/Commission.php",
+                "resources/views/commissions/index.blade.php"
+            ]
+        },
+        {
+            "name": "Reports & Analytics",
+            "description": "Comprehensive reporting including profit/loss, expense analysis, inventory aging, supplier reports",
+            "files": [
+                "app/Http/Controllers/ReportsController.php",
+                "app/Http/Controllers/Reports/ProfitLossController.php",
+                "app/Http/Controllers/Reports/ExpenseAnalysisController.php",
+                "app/Http/Controllers/Reports/InventoryAgingController.php",
+                "resources/views/reports/index.blade.php"
+            ]
+        },
+        {
+            "name": "Settings & Configuration",
+            "description": "System settings, company settings, user preferences, module management, document templates",
+            "files": [
+                "app/Http/Controllers/SettingsController.php",
+                "app/Http/Controllers/DocumentTemplateController.php",
+                "app/Models/DocumentTemplate.php",
+                "resources/views/settings/index.blade.php",
+                "resources/views/document-templates/index.blade.php"
+            ]
+        },
+        {
+            "name": "Audit Logging",
+            "description": "System-wide audit trail, activity tracking, audit log viewing and export",
+            "files": [
+                "app/Http/Controllers/AuditLogController.php",
+                "app/Models/AuditLog.php",
+                "resources/views/audit-logs/index.blade.php"
+            ]
+        },
+        {
+            "name": "Notifications",
+            "description": "System notifications and alerts",
+            "files": [
+                "app/Http/Controllers/NotificationController.php",
+                "resources/views/notifications/index.blade.php"
+            ]
+        },
+        {
+            "name": "Category Management",
+            "description": "Product categories and subcategories hierarchy",
+            "files": [
+                "app/Http/Controllers/CategoryController.php",
+                "app/Http/Controllers/SubcategoryController.php",
+                "app/Models/Category.php",
+                "app/Models/Subcategory.php"
+            ]
+        }
+    ]
+}

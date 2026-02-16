@@ -1,0 +1,186 @@
+@import 'tailwindcss';
+@plugin "@tailwindcss/forms";
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Override Indigo Palette for Branding using #0001f1 */
+    /* 600 is the primary sidebar color */
+    --color-indigo-50: #efeffd;
+    --color-indigo-100: #e0e0fc;
+    --color-indigo-200: #c2c3fa;
+    --color-indigo-300: #9395f6;
+    --color-indigo-400: #6562f0;
+    --color-indigo-500: #4240e8;
+    --color-indigo-600: #0001f1; /* User requested color */
+    --color-indigo-700: #0001c9; /* Darker shade for hover/dark mode */
+    --color-indigo-800: #0001a0;
+    --color-indigo-900: #00017a;
+    --color-indigo-950: #00004a;
+}
+
+/* Alpine.js x-cloak */
+[x-cloak] {
+    display: none !important;
+}
+
+/* Dark Theme Support */
+.dark {
+    color-scheme: dark;
+}
+
+.dark body {
+    @apply bg-gray-900 text-gray-100;
+}
+
+.dark .bg-gray-50 {
+    @apply bg-gray-900;
+}
+
+.dark .bg-white {
+    @apply bg-gray-800;
+}
+
+.dark .bg-gray-100 {
+    @apply bg-gray-700;
+}
+
+.dark .text-gray-900 {
+    @apply text-gray-100;
+}
+
+.dark .text-gray-800 {
+    @apply text-gray-200;
+}
+
+.dark .text-gray-700 {
+    @apply text-gray-300;
+}
+
+.dark .text-gray-600 {
+    @apply text-gray-400;
+}
+
+.dark .text-gray-500 {
+    @apply text-gray-500;
+}
+
+.dark .border-gray-200 {
+    @apply border-gray-700;
+}
+
+.dark .border-gray-300 {
+    @apply border-gray-600;
+}
+
+.dark .bg-indigo-600 {
+    @apply bg-indigo-700;
+}
+
+.dark .hover\:bg-indigo-700:hover {
+    @apply bg-indigo-800;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+    @apply bg-gray-700 border-gray-600 text-gray-100;
+}
+
+.dark input:focus,
+.dark select:focus,
+.dark textarea:focus {
+    @apply border-indigo-500 ring-indigo-500;
+}
+
+/* Compact Mode Support */
+.compact-mode {
+    font-size: 0.9rem;
+}
+
+.compact-mode .p-6 {
+    @apply p-4;
+}
+
+.compact-mode .p-4 {
+    @apply p-3;
+}
+
+.compact-mode .py-6 {
+    @apply py-4;
+}
+
+.compact-mode .py-4 {
+    @apply py-3;
+}
+
+.compact-mode .py-2 {
+    @apply py-1;
+}
+
+.compact-mode .px-4 {
+    @apply px-3;
+}
+
+.compact-mode .px-2 {
+    @apply px-1.5;
+}
+
+.compact-mode .gap-4 {
+    @apply gap-3;
+}
+
+.compact-mode .gap-2 {
+    @apply gap-1.5;
+}
+
+.compact-mode .mb-6 {
+    @apply mb-4;
+}
+
+.compact-mode .mb-4 {
+    @apply mb-3;
+}
+
+.compact-mode .space-y-6 > * + * {
+    margin-top: 1rem;
+}
+
+.compact-mode .space-y-4 > * + * {
+    margin-top: 0.75rem;
+}
+
+.compact-mode table td,
+.compact-mode table th {
+    @apply py-2 px-3;
+}
+
+/* Font Size Variations */
+.font-size-small {
+    font-size: 0.875rem;
+}
+
+.font-size-medium {
+    font-size: 1rem;
+}
+
+.font-size-large {
+    font-size: 1.125rem;
+}
+
+.font-size-large h1 {
+    font-size: 2rem;
+}
+
+.font-size-large h2 {
+    font-size: 1.5rem;
+}
+
+.font-size-large h3 {
+    font-size: 1.25rem;
+}

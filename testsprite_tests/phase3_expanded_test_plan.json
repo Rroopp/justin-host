@@ -1,0 +1,694 @@
+[
+    {
+        "id": "TC_EXP_003",
+        "title": "Create New Expense (Paid)",
+        "description": "Verify creating a new expense record with status 'paid' and valid category/account",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Navigate to Expenses -> Create"
+            },
+            {
+                "type": "action",
+                "description": "Fill details (Payee, Amount, Date, Category, Paid Status)"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify expense created"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_004",
+        "title": "Create Bill (Unpaid)",
+        "description": "Verify creating an unpaid bill/expense with a due date",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Navigate to Expenses -> Create"
+            },
+            {
+                "type": "action",
+                "description": "Set Status to 'Unpaid' and Due Date"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify bill appears in Unpaid list"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_005",
+        "title": "Edit Expense Details",
+        "description": "Verify updating an existing expense amount and description",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Open existing expense"
+            },
+            {
+                "type": "action",
+                "description": "Edit amount"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify changes saved"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_006",
+        "title": "Delete Expense",
+        "description": "Verify deleting an expense record",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Select expense"
+            },
+            {
+                "type": "action",
+                "description": "Click Delete"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify expense removed from list"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_007",
+        "title": "View Expense Details",
+        "description": "Verify viewing full details of a single expense",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click View on expense row"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify all fields match record"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_008",
+        "title": "Filter Expenses by Date",
+        "description": "Verify filtering expenses list by date range",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Apply Date Filter"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify filtered results are within range"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_009",
+        "title": "Pay Bill (Mark as Paid)",
+        "description": "Verify converting an unpaid bill to paid",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Open Unpaid Bill"
+            },
+            {
+                "type": "action",
+                "description": "Click Mark as Paid"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status updates to Paid"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_010",
+        "title": "Attach Receipt",
+        "description": "Verify uploading a receipt image to an expense",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Upload file during creation/edit"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify file link appears"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_011",
+        "title": "Verify Expense Category Logic",
+        "description": "Verify expenses are correctly categorized in reports",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Create expense in specific category"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify category totals update"
+            }
+        ]
+    },
+    {
+        "id": "TC_EXP_012",
+        "title": "Export Expenses",
+        "description": "Verify exporting expenses list to CSV/PDF",
+        "category": "expenses",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click Export"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify download starts"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_003",
+        "title": "Create Annual Budget",
+        "description": "Verify creating a new annual budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Navigate to Budgets -> Create"
+            },
+            {
+                "type": "action",
+                "description": "Select Annual, Enter Amount"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify budget created"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_004",
+        "title": "Add Line Items to Budget",
+        "description": "Verify adding specific line items (allocations) to a budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Open Budget"
+            },
+            {
+                "type": "action",
+                "description": "Add Line Item"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify line item added and total updates"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_005",
+        "title": "Edit Budget (Draft)",
+        "description": "Verify editing a draft budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Edit draft budget fields"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify updates saved"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_006",
+        "title": "Approve Budget",
+        "description": "Verify approving a draft budget to make it active",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click Approve on draft budget"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status becomes Active"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_007",
+        "title": "Reject/Archive Budget",
+        "description": "Verify archiving an active budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click Archive"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status archived"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_008",
+        "title": "View Budget Details",
+        "description": "Verify viewing detailed breakdown of a budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "View Budget"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify details visible"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_009",
+        "title": "Verify Variance Calculation",
+        "description": "Verify that variance (Budget - Actual) is calculated correctly",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "assertion",
+                "description": "Check calculated variance fields on dashboard"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_010",
+        "title": "Verify Over-Budget Alert",
+        "description": "Verify visual indicators when actual exceeds budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "assertion",
+                "description": "Check for red flags/alerts on over-budget items"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_011",
+        "title": "Filter Budgets",
+        "description": "Verify filtering budget list by year or status",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Apply filters"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify list updates"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_012",
+        "title": "Budget Utilization Report",
+        "description": "Verify the utilization percentage display",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "assertion",
+                "description": "Verify utilization % calculation"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_013",
+        "title": "Budget vs Actuals Dashboard",
+        "description": "Verify the main Budget vs Actuals chart/table",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "assertion",
+                "description": "Verify chart renders"
+            }
+        ]
+    },
+    {
+        "id": "TC_BUDG_014",
+        "title": "Clone Budget",
+        "description": "Verify cloning an existing budget",
+        "category": "budgets",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click Clone/Duplicate"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify new draft created with same items"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_003",
+        "title": "Add Items to Rental",
+        "description": "Verify adding products to a rental order",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Open Rental"
+            },
+            {
+                "type": "action",
+                "description": "Add Product"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify item added to list"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_004",
+        "title": "Remove Items from Rental",
+        "description": "Verify removing items from a draft rental",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Remove item"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify item removed"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_005",
+        "title": "Edit Rental Dates",
+        "description": "Verify updating rental duration",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Change expected return date"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify date updated"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_006",
+        "title": "View Rental Details",
+        "description": "Verify viewing details of a rental",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "View details"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify fields match"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_007",
+        "title": "Return Rental (Full)",
+        "description": "Verify returning all items in a rental",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click Return"
+            },
+            {
+                "type": "action",
+                "description": "Confirm all items"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status Returned"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_008",
+        "title": "Return Rental (Partial)",
+        "description": "Verify returning only some items",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Return subset of items"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status Partial/Active"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_009",
+        "title": "Return Rental (Damaged)",
+        "description": "Verify recording damaged condition on return",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Return item"
+            },
+            {
+                "type": "action",
+                "description": "Set condition Damaged"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify damage recorded"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_010",
+        "title": "Late Return Fees",
+        "description": "Verify calculation of late fees",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Return late item"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify fee added"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_011",
+        "title": "View Rental History",
+        "description": "Verify viewing history of rentals for a customer",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "View customer history"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify list of past rentals"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_012",
+        "title": "Verify Stock Deduction",
+        "description": "Verify inventory stock decreases when rented",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "assertion",
+                "description": "Check inventory count before/after rent"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_013",
+        "title": "Search Rentals",
+        "description": "Verify searching rentals by customer name or ID",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Search for customer"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify result found"
+            }
+        ]
+    },
+    {
+        "id": "TC_RENT_014",
+        "title": "Generate Rental Invoice",
+        "description": "Verify invoice generation for rental",
+        "category": "rentals",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Click Generate Invoice"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify invoice created"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_002",
+        "title": "Initiate Refund (Full)",
+        "description": "Verify initiating a full refund for a sale",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Select Sales"
+            },
+            {
+                "type": "action",
+                "description": "Click Request Refund"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify refund request created"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_003",
+        "title": "Initiate Refund (Partial)",
+        "description": "Verify initiating a partial refund",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Select specific items to refund"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify partial refund amount"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_004",
+        "title": "Refund Approval",
+        "description": "Verify admin approval of refund",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Admin triggers Approval"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status Approved"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_005",
+        "title": "Refund Rejection",
+        "description": "Verify rejection of refund request",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Admin triggers Reject"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify status Rejected"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_006",
+        "title": "Refund to Credit",
+        "description": "Verify refunding to customer store credit",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Select Credit method"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify customer credit balance"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_007",
+        "title": "Refund to Cash",
+        "description": "Verify refunding via cash",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "Select Cash method"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify cash drawer impact"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_008",
+        "title": "Verify Stock Restock",
+        "description": "Verify refunded items returned to inventory",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "assertion",
+                "description": "Check inventory count updates after refund"
+            }
+        ]
+    },
+    {
+        "id": "TC_REF_009",
+        "title": "View Refund Details",
+        "description": "Verify viewing details of a processed refund",
+        "category": "refunds",
+        "steps": [
+            {
+                "type": "action",
+                "description": "View refund"
+            },
+            {
+                "type": "assertion",
+                "description": "Verify details"
+            }
+        ]
+    }
+]
