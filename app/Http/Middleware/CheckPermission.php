@@ -13,7 +13,7 @@ class CheckPermission
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next, string $permission): Response
+    public function handle(Request $request, Closure $next, string ...$permissions): Response
     {
         if (!$request->user()) {
             if ($request->expectsJson()) {
@@ -22,8 +22,24 @@ class CheckPermission
             return redirect()->route('login');
         }
 
-        if (!$request->user()->hasPermission($permission)) {
-            $message = "You do not have the required permission: {$permission}";
+        // Support comma-separated permissions in a single argument
+        $allPermissions = [];
+        foreach ($permissions as $permission) {
+            $allPermissions = array_merge($allPermissions, explode(',', $permission));
+        }
+        $allPermissions = array_map('trim', $allPermissions);
+
+        // Check if user has ANY of the required permissions (OR logic)
+        $hasPermission = false;
+        foreach ($allPermissions as $permission) {
+            if ($request->user()->hasPermission($permission)) {
+                $hasPermission = true;
+                break;
+            }
+        }
+
+        if (!$hasPermission) {
+            $message = "You do not have any of the required permissions: " . implode(', ', $allPermissions);
             if ($request->expectsJson()) {
                 return response()->json(['message' => $message], 403);
             }

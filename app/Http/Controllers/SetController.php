@@ -60,18 +60,24 @@ class SetController extends Controller
             'instruments.*.quantity' => 'required|integer|min:1',
             'instruments.*.inventory_id' => 'nullable|exists:inventory_master,id',
             'instruments.*.serial_number' => 'nullable|string',
+
+            // Consumables (Contents)
+            'contents' => 'nullable|array',
+            'contents.*.inventory_id' => 'required|exists:inventory_master,id',
+            'contents.*.quantity' => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
         try {
             // 1. Create Asset (Financial Entity)
+            // Note: Asset model has guarded = [], so all fields are assignable.
             $asset = Asset::create([
                 'name' => $validated['asset_name'],
                 'category' => 'Surgical Set',
                 'purchase_price' => $validated['purchase_price'],
                 'purchase_date' => $validated['purchase_date'],
-                'useful_life_years' => 5,
-                'location' => 'Main Store',
+                'useful_life_years' => 5, // Default
+                'location' => 'Main Store', // Initial location
                 'status' => 'active', 
             ]);
 
@@ -120,10 +126,24 @@ class SetController extends Controller
 
             DB::commit();
 
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Surgical Set created successfully.',
+                    'redirect' => route('sets.index')
+                ]);
+            }
+
             return redirect()->route('sets.index')->with('success', 'Surgical Set created successfully.');
 
         } catch (\Exception $e) {
             DB::rollBack();
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to create set: ' . $e->getMessage()
+                ], 500);
+            }
             return back()->with('error', 'Failed: ' . $e->getMessage())->withInput();
         }
     }
@@ -147,6 +167,82 @@ class SetController extends Controller
                 ->get();
         }
 
-        return view('sets.show', compact('set', 'instruments', 'consumables'));
+        // 3. Set Contents (Template) - Fix for undefined variable in view
+        $contents = collect();
+        if ($set->location) {
+             $contents = $set->location->setContents()->with('inventory')->get();
+        }
+
+        return view('sets.show', compact('set', 'instruments', 'consumables', 'contents'));
+    }
+
+    /**
+     * Remove the specified surgical set from storage.
+     */
+    public function destroy(SurgicalSet $set)
+    {
+        DB::beginTransaction();
+        try {
+            // 1. Delete Related Instruments
+            $set->instruments()->delete();
+
+            // 2. Find and Handle Location & Contents
+            $location = $set->location;
+            if ($location) {
+                // Delete set contents (template)
+                $location->setContents()->delete();
+                
+                // Note: We leave Batches (Stock) alone or delete them?
+                // If we delete location, batches constraint might fail or cascade.
+                // Assuming batches cascade or we should delete them.
+                // For safety, we'll let DB cascade handle it if set up, or just delete location.
+                $location->delete();
+            }
+
+            // 3. Delete Asset
+            if ($set->asset) {
+                $set->asset->delete();
+            }
+
+            // 4. Delete the Set itself
+            $set->delete();
+
+            DB::commit();
+            return redirect()->route('sets.index')->with('success', 'Surgical Set deleted successfully.');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Failed to delete set: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update the status of the specified set manually.
+     */
+    public function updateStatus(Request $request, SurgicalSet $set)
+    {
+        $validated = $request->validate([
+            'status' => 'required|string',
+            'sterilization_status' => 'nullable|string|in:sterile,non_sterile,expired',
+        ]);
+
+        // Basic validation of status against model constants would be ideal, 
+        // but for flexibility we allow strings, or strict check:
+        // $allowed = [SurgicalSet::STATUS_AVAILABLE, SurgicalSet::STATUS_DIRTY, ...];
+
+        $set->status = $validated['status'];
+        
+        if ($request->has('sterilization_status')) {
+            $set->sterilization_status = $validated['sterilization_status'];
+        }
+
+        // Auto-logic for convenience
+        if ($set->status === SurgicalSet::STATUS_DIRTY) {
+            $set->sterilization_status = 'non_sterile';
+        }
+
+        $set->save();
+
+        return back()->with('success', "Set updated: {$set->status}");
     }
 }

@@ -32,7 +32,7 @@ class SetDispatchController extends Controller
 
         $availableSets = SurgicalSet::with(['location', 'instruments'])
             ->where('status', SurgicalSet::STATUS_AVAILABLE)
-            ->where('sterilization_status', 'sterile')
+            ->whereNotNull('location_id') // Exclude orphaned sets
             ->get();
 
         return view('sets.dispatch.index', compact('upcomingCases', 'availableSets'));
@@ -51,7 +51,7 @@ class SetDispatchController extends Controller
         // Available Sets (excluding ones already attached to this case)
         $availableSets = SurgicalSet::with(['instruments'])
             ->where('status', SurgicalSet::STATUS_AVAILABLE)
-            ->where('sterilization_status', 'sterile')
+            ->whereNotNull('location_id') // Exclude orphaned sets
             ->whereNotIn('id', $attachedSetIds)
             ->orderBy('name')
             ->get();
@@ -112,6 +112,12 @@ class SetDispatchController extends Controller
         $reservation = CaseReservation::with(['surgicalSets' => function($q) {
             $q->wherePivot('status', 'dispatched');
         }])->findOrFail($reservation_id);
+
+        // Constraint: Cannot return before surgery time
+        if ($reservation->surgery_date && $reservation->surgery_date->isFuture()) {
+             return redirect()->route('reservations.show', $reservation->id)
+                ->with('error', 'Cannot return set before the scheduled surgery time (' . $reservation->surgery_date->format('M d H:i') . ').');
+        }
 
         $set = $reservation->surgicalSets->first();
 

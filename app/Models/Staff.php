@@ -28,6 +28,22 @@ class Staff extends Authenticatable
         'is_deleted',
         'permissions',
     ];
+
+    /**
+     * Boot the model.
+     * Auto-assign default permissions based on role when creating a new staff member.
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function (self $staff) {
+            // Only assign defaults if permissions is not already set
+            if (empty($staff->permissions)) {
+                $staff->permissions = config("permissions.defaults.{$staff->role}", []);
+            }
+        });
+    }
     protected $casts = [
         'salary' => 'decimal:2',
         'is_deleted' => 'boolean',

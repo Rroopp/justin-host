@@ -185,11 +185,23 @@ function aiReports() {
                     },
                     body: JSON.stringify({ period: this.period })
                 });
+                
+                // Check if response is JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    const text = await response.text();
+                    console.error('Server returned non-JSON response:', text.substring(0, 500));
+                    throw new Error('Server error: ' + response.status + '. Please check the logs.');
+                }
+                
                 const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.message || 'Failed to generate report');
+                }
                 this.summary = data.html;
             } catch (e) {
                 console.error(e);
-                alert('Failed to generate report');
+                alert('Failed to generate report: ' + e.message);
             } finally {
                 this.loading = false;
             }

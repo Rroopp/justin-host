@@ -7,8 +7,11 @@ use App\Models\ConsignmentStockLevel;
 use App\Models\Location;
 use App\Models\Inventory;
 use App\Models\Batch;
+use App\Services\ConsignmentBillingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ConsignmentController extends Controller
 {
@@ -64,7 +67,7 @@ class ConsignmentController extends Controller
             $transaction = ConsignmentTransaction::create([
                 ...$validated,
                 'transaction_type' => 'placed',
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id(),
             ]);
 
             // Update or create stock level
@@ -100,7 +103,7 @@ class ConsignmentController extends Controller
                 ...$validated,
                 'transaction_type' => 'used',
                 'billed' => false,
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id(),
             ]);
 
             // Update stock level
@@ -133,7 +136,7 @@ class ConsignmentController extends Controller
             $transaction = ConsignmentTransaction::create([
                 ...$validated,
                 'transaction_type' => 'returned',
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id(),
             ]);
 
             // Update stock level
@@ -171,7 +174,7 @@ class ConsignmentController extends Controller
     }
 
     /**
-     * Generate bill for unbilled transactions
+     * Generate bill for unbilled transactions (USED items only)
      */
     public function generateBill(Request $request)
     {
@@ -179,8 +182,52 @@ class ConsignmentController extends Controller
             'transaction_ids' => 'required|array',
             'transaction_ids.*' => 'exists:consignment_transactions,id',
             'billing_reference' => 'nullable|string',
+            'customer_id' => 'nullable|exists:customers,id',
+            'patient_name' => 'nullable|string',
+            'surgeon_name' => 'nullable|string',
+            'auto_create_sale' => 'nullable|boolean', // Use new billing service
         ]);
 
+        // Check if we should use the new billing service
+        if (!empty($validated['auto_create_sale']) && ConsignmentBillingService::isEnabled()) {
+            $billingService = new ConsignmentBillingService();
+            
+            $saleData = [
+                'customer_id' => $validated['customer_id'] ?? null,
+                'patient_name' => $validated['patient_name'] ?? null,
+                'surgeon_name' => $validated['surgeon_name'] ?? null,
+            ];
+            
+            $customer = null;
+            if (!empty($validated['customer_id'])) {
+                $customer = \App\Models\Customer::find($validated['customer_id']);
+            }
+            
+            $posSale = $billingService->createSaleFromConsignment(
+                $validated['transaction_ids'],
+                $customer,
+                $saleData,
+                Auth::user()
+            );
+            
+            if ($posSale) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'message' => 'Invoice created successfully',
+                        'pos_sale_id' => $posSale->id,
+                        'invoice_number' => $posSale->invoice_number,
+                        'total' => $posSale->total
+                    ]);
+                }
+                
+                return redirect()->route('sales.invoices.show', $posSale->id)
+                    ->with('success', "Invoice {$posSale->invoice_number} created successfully. Total: " . format_currency($posSale->total));
+            }
+            
+            return redirect()->back()->with('error', 'Failed to create invoice. Check that transactions are unbilled and of type "used".');
+        }
+        
+        // Legacy: Just mark as billed without creating POS sale
         $transactions = ConsignmentTransaction::whereIn('id', $validated['transaction_ids'])->get();
 
         DB::transaction(function () use ($transactions, $validated) {
@@ -194,6 +241,36 @@ class ConsignmentController extends Controller
         }
 
         return redirect()->back()->with('success', $transactions->count() . ' transactions marked as billed');
+    }
+    
+    /**
+     * Auto-bill all unbilled transactions for a location
+     */
+    public function autoBillLocation(Location $location, Request $request)
+    {
+        if (!$location->isConsignment()) {
+            return redirect()->back()->with('error', 'Not a consignment location');
+        }
+        
+        if (!ConsignmentBillingService::isEnabled()) {
+            return redirect()->back()->with('error', 'Auto-billing is disabled. Enable feature flag first.');
+        }
+        
+        $validated = $request->validate([
+            'patient_name' => 'nullable|string',
+            'surgeon_name' => 'nullable|string',
+        ]);
+        
+        $billingService = new ConsignmentBillingService();
+        
+        $posSale = $billingService->autoBillLocation($location, $validated, Auth::user());
+        
+        if ($posSale) {
+            return redirect()->route('sales.invoices.show', $posSale->id)
+                ->with('success', "Invoice {$posSale->invoice_number} created for {$location->name}. Total: " . format_currency($posSale->total));
+        }
+        
+        return redirect()->back()->with('info', 'No unbilled transactions found for this location.');
     }
 
     /**
@@ -411,7 +488,7 @@ class ConsignmentController extends Controller
 
                      if ($usedQty > 0) {
                         ConsignmentTransaction::create([
-                            'location_id' => auth()->user()->location_id ?? Location::where('type', 'consignment')->first()->id ?? 1, // Fallback location
+                            'location_id' => Auth::user()->location_id ?? Location::where('type', 'consignment')->first()->id ?? 1, // Fallback location
                             'inventory_id' => $inventoryId,
                             'batch_id' => $batchId,
                             'transaction_type' => 'used',
@@ -419,7 +496,7 @@ class ConsignmentController extends Controller
                             'transaction_date' => now(),
                             'reference_type' => \App\Models\PosSale::class,
                             'reference_id' => $sale->id,
-                            'created_by' => auth()->id(),
+                            'created_by' => Auth::id(),
                             'billed' => true, // Auto-billed by logic below
                             'notes' => 'Reconciled from legacy sale'
                         ]);
@@ -440,7 +517,7 @@ class ConsignmentController extends Controller
                      if ($returnedQty > 0) {
                          // CREATE RETURN RECORD
                         ConsignmentTransaction::create([
-                            'location_id' => auth()->user()->location_id ?? Location::where('type', 'consignment')->first()->id ?? 1,
+                            'location_id' => Auth::user()->location_id ?? Location::where('type', 'consignment')->first()->id ?? 1,
                             'inventory_id' => $inventoryId,
                             'batch_id' => $batchId,
                             'transaction_type' => 'returned',
@@ -448,7 +525,7 @@ class ConsignmentController extends Controller
                             'transaction_date' => now(),
                             'reference_type' => \App\Models\PosSale::class,
                             'reference_id' => $sale->id,
-                            'created_by' => auth()->id(),
+                            'created_by' => Auth::id(),
                             'notes' => 'Returned from Legacy Sale Reconstruction'
                         ]);
                         
@@ -529,7 +606,7 @@ class ConsignmentController extends Controller
                         'transaction_date' => now(),
                         'reference_type' => \App\Models\PosSale::class,
                         'reference_id' => $sale->id,
-                        'created_by' => auth()->id(),
+                        'created_by' => Auth::id(),
                         'notes' => "Returned from Surgery via Reconciliation (Sale #{$sale->id})",
                     ]);
 

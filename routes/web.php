@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/staff/dashboard', [App\Http\Controllers\StaffDashboardController::class, 'index'])->name('staff.dashboard')->middleware('role:staff');
     
     // Audit Logs (Admin Only)
     Route::middleware('role:admin')->group(function () {
@@ -54,17 +55,17 @@ Route::middleware('auth')->group(function () {
     });
     
     // Banking & Cash Management
-    Route::prefix('accounting/banking')->middleware(['auth', 'role:admin,accountant'])->name('banking.')->group(function () {
+    Route::prefix('accounting/banking')->middleware(['auth', 'permission:banking.view,banking.manage'])->name('banking.')->group(function () {
         Route::get('/', [App\Http\Controllers\BankingController::class, 'index'])->name('index');
         Route::get('/{id}', [App\Http\Controllers\BankingController::class, 'show'])->name('show');
-        Route::post('/deposit', [App\Http\Controllers\BankingController::class, 'storeDeposit'])->name('deposit');
-        Route::post('/transfer', [App\Http\Controllers\BankingController::class, 'storeTransfer'])->name('transfer');
-        Route::post('/expense', [App\Http\Controllers\BankingController::class, 'storeExpense'])->name('expense');
+        Route::post('/deposit', [App\Http\Controllers\BankingController::class, 'storeDeposit'])->name('deposit')->middleware('permission:banking.manage');
+        Route::post('/transfer', [App\Http\Controllers\BankingController::class, 'storeTransfer'])->name('transfer')->middleware('permission:banking.manage');
+        Route::post('/expense', [App\Http\Controllers\BankingController::class, 'storeExpense'])->name('expense')->middleware('permission:banking.manage');
     });
 
     // POS (Staff & Admin)
     Route::get('/pos/search', [POSController::class, 'search'])->name('pos.search')->middleware(['role:admin,staff']);
-    Route::get('/pos', [POSController::class, 'index'])->name('pos.index')->middleware(['role:admin,staff', 'permission:pos.access']);
+    Route::get('/pos', [POSController::class, 'index'])->name('pos.index')->middleware(['role:admin,staff']);
     Route::get('/receipts/{id}/print', [POSController::class, 'printReceipt'])->name('receipts.print')->middleware('role:admin,staff');
     Route::get('/pos/receipt/{id}', [POSController::class, 'getReceipt'])->name('pos.receipt.data')->middleware('auth');
     Route::get('/pos/receipt-view/{id}', [POSController::class, 'printReceipt'])->name('pos.receipt.view')->middleware('auth');
@@ -73,16 +74,16 @@ Route::middleware('auth')->group(function () {
     Route::delete('/pos/cart/{id}', [POSController::class, 'deleteCart'])->name('pos.cart.delete')->middleware('auth');
     
     // Inventory (Staff & Admin)
-    Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store')->middleware(['role:admin,staff', 'permission:inventory.edit']);
+    Route::post('/inventory', [InventoryController::class, 'store'])->name('inventory.store')->middleware(['role:admin,staff']);
     Route::group(['middleware' => ['role:admin,staff']], function () {
-        Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index')->middleware('permission:inventory.view');
-        Route::get('/inventory/categories', [CategoryController::class, 'index'])->name('inventory.categories')->middleware('permission:inventory.view');
-        Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update')->middleware('permission:inventory.edit');
-        Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy')->middleware('permission:inventory.edit');
+        Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+        Route::get('/inventory/categories', [CategoryController::class, 'index'])->name('inventory.categories');
+        Route::put('/inventory/{inventory}', [InventoryController::class, 'update'])->name('inventory.update');
+        Route::delete('/inventory/{inventory}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
     });
     
     // Sales Reports / Invoices (Accountant & Admin)
-    Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware(['role:admin,accountant,staff', 'permission:sales.view']);
+    Route::get('/sales', [SalesController::class, 'index'])->name('sales.index')->middleware(['role:admin,accountant,staff']);
     Route::get('/sales/invoices', [SalesController::class, 'invoices'])->name('sales.invoices.index')->middleware('role:admin,accountant');
     Route::get('/sales/invoices/summary', [SalesController::class, 'summaryInvoice'])->name('sales.invoices.summary')->middleware('role:admin,accountant');
     Route::get('/sales/invoices/pending/{customerId}', [SalesController::class, 'getPendingInvoices'])->name('sales.invoices.pending')->middleware('auth');
@@ -146,27 +147,29 @@ Route::middleware('auth')->group(function () {
     Route::get('/inventory/valuation', [App\Http\Controllers\InventoryValuationController::class, 'index'])->name('inventory.valuation.index')->middleware('role:admin,accountant');
 
     // Case Reservations (Surgery Management)
-    Route::get('/reservations/search-items', [App\Http\Controllers\CaseReservationController::class, 'searchItems'])->name('reservations.search_items')->middleware('role:admin,staff');
-    Route::resource('reservations', App\Http\Controllers\CaseReservationController::class)->middleware('role:admin,staff');
-    Route::post('/reservations/{reservation}/add-set', [App\Http\Controllers\CaseReservationController::class, 'addSet'])->name('reservations.add_set')->middleware('role:admin,staff');
-    Route::post('/reservations/{reservation}/items', [App\Http\Controllers\CaseReservationController::class, 'addItem'])->name('reservations.items.add')->middleware('role:admin,staff');
-    Route::post('/reservations/{reservation}/add-package', [App\Http\Controllers\CaseReservationController::class, 'addPackage'])->name('reservations.add_package')->middleware('role:admin,staff');
-    Route::delete('/reservations/{reservation}/items/{item}', [App\Http\Controllers\CaseReservationController::class, 'removeItem'])->name('reservations.items.remove')->middleware('role:admin,staff');
-    Route::post('/reservations/{reservation}/confirm', [App\Http\Controllers\CaseReservationController::class, 'confirm'])->name('reservations.confirm')->middleware('role:admin,staff');
-    Route::get('/reservations/{reservation}/confirm', function ($reservation) { return redirect()->route('reservations.show', $reservation); })->middleware('role:admin,staff');
-    Route::post('/reservations/{reservation}/complete', [App\Http\Controllers\CaseReservationController::class, 'complete'])->name('reservations.complete')->middleware('role:admin,staff');
-    Route::post('/reservations/{reservation}/cancel', [App\Http\Controllers\CaseReservationController::class, 'cancel'])->name('reservations.cancel')->middleware('role:admin,staff');
+    Route::get('/reservations/search-items', [App\Http\Controllers\CaseReservationController::class, 'searchItems'])->name('reservations.search_items')->middleware('permission:surgery.view,surgery.manage');
+    Route::resource('reservations', App\Http\Controllers\CaseReservationController::class)->middleware('permission:surgery.view,surgery.manage');
+    Route::post('/reservations/{reservation}/add-set', [App\Http\Controllers\CaseReservationController::class, 'addSet'])->name('reservations.add_set')->middleware('permission:surgery.manage');
+    Route::post('/reservations/{reservation}/items', [App\Http\Controllers\CaseReservationController::class, 'addItem'])->name('reservations.items.add')->middleware('permission:surgery.manage');
+    Route::post('/reservations/{reservation}/add-package', [App\Http\Controllers\CaseReservationController::class, 'addPackage'])->name('reservations.add_package')->middleware('permission:surgery.manage');
+    Route::delete('/reservations/{reservation}/items/{item}', [App\Http\Controllers\CaseReservationController::class, 'removeItem'])->name('reservations.items.remove')->middleware('permission:surgery.manage');
+    Route::post('/reservations/{reservation}/confirm', [App\Http\Controllers\CaseReservationController::class, 'confirm'])->name('reservations.confirm')->middleware('permission:surgery.manage');
+    Route::get('/reservations/{reservation}/confirm', function ($reservation) { return redirect()->route('reservations.show', $reservation); })->middleware('permission:surgery.view,surgery.manage');
+    Route::post('/reservations/{reservation}/complete', [App\Http\Controllers\CaseReservationController::class, 'complete'])->name('reservations.complete')->middleware('permission:surgery.manage');
+    Route::post('/reservations/{reservation}/cancel', [App\Http\Controllers\CaseReservationController::class, 'cancel'])->name('reservations.cancel')->middleware('permission:surgery.manage');
     
     // Set Dispatch Workflow
-    Route::get('/reservations/{id}/dispatch', [App\Http\Controllers\SetDispatchController::class, 'create'])->name('dispatch.create')->middleware('role:admin,staff');
-    Route::post('/reservations/{id}/dispatch', [App\Http\Controllers\SetDispatchController::class, 'store'])->name('dispatch.store')->middleware('role:admin,staff');
-    Route::get('/reservations/{id}/reconcile-set', [App\Http\Controllers\SetDispatchController::class, 'reconcile'])->name('reconcile.create')->middleware('role:admin,staff');
-    Route::post('/reservations/{id}/reconcile-set', [App\Http\Controllers\SetDispatchController::class, 'storeReconciliation'])->name('reconcile.store')->middleware('role:admin,staff');
+    Route::get('/sets/dispatch/dashboard', [App\Http\Controllers\SetDispatchController::class, 'index'])->name('dispatch.index')->middleware('permission:surgery.view,surgery.manage');
+    Route::get('/reservations/{id}/dispatch', [App\Http\Controllers\SetDispatchController::class, 'create'])->name('dispatch.create')->middleware('permission:surgery.manage');
+    Route::post('/reservations/{id}/dispatch', [App\Http\Controllers\SetDispatchController::class, 'store'])->name('dispatch.store')->middleware('permission:surgery.manage');
+    Route::get('/reservations/{id}/reconcile-set', [App\Http\Controllers\SetDispatchController::class, 'reconcile'])->name('reconcile.create')->middleware('permission:surgery.manage');
+    Route::post('/reservations/{id}/reconcile-set', [App\Http\Controllers\SetDispatchController::class, 'storeReconciliation'])->name('reconcile.store')->middleware('permission:surgery.manage');
     
-    // Suppliers
-    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index')->middleware('role:admin,staff');
+    // Suppliers (Admin Only)
+    Route::get('/suppliers', [SupplierController::class, 'index'])->name('suppliers.index')->middleware('role:admin');
 
     // Surgical Sets (Location-Assets)
+    Route::put('/sets/{set}/status', [App\Http\Controllers\SetController::class, 'updateStatus'])->name('sets.status.update')->middleware('role:admin,staff');
     Route::resource('sets', App\Http\Controllers\SetController::class)->middleware('role:admin,staff');
     
     // Staff (Admin Only)
@@ -201,9 +204,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/stock-takes/{stockTake}/reconcile', [App\Http\Controllers\StockTakeController::class, 'reconcile'])->name('stock-takes.reconcile')->middleware('role:admin');
     Route::get('/stock-takes/{stockTake}/export', [App\Http\Controllers\StockTakeController::class, 'export'])->name('stock-takes.export')->middleware('role:admin,accountant');
     
-    // Settings (Admin Only)
-    // Settings (Admin, Staff, Accountant - handled in controller for granular access)
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('role:admin,staff,accountant');
+    // Settings (Admin, Accountant & Staff - Staff can access for password change and preferences)
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('role:admin,accountant,staff');
     
     // User Preferences (available to all authenticated users)
     Route::get('/settings/user/preferences', [SettingsController::class, 'userPreferences'])->name('settings.user.preferences');
@@ -222,7 +224,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings/audit-log', [SettingsController::class, 'auditLog'])->name('settings.audit-log')->middleware('role:admin');
     
     // Settings API
-    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('role:admin');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index')->middleware('role:admin,staff');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update')->middleware('role:admin');
     Route::get('/settings/company', [SettingsController::class, 'company'])->name('settings.company')->middleware('role:admin');
     Route::put('/settings/company', [SettingsController::class, 'updateCompany'])->name('settings.company.update')->middleware('role:admin');
@@ -247,25 +249,25 @@ Route::middleware('auth')->group(function () {
     // Document Templates
     Route::get('/document-templates', [DocumentTemplateController::class, 'index'])->name('document-templates.index')->middleware('role:admin');
     
-    // Accounting (Accountant & Admin)
-    Route::get('/accounting', [AccountingController::class, 'index'])->name('accounting.index')->middleware(['role:admin,accountant', 'permission:finance.view']);
-    Route::get('/accounting/journal-entries', [AccountingController::class, 'journalEntries'])->name('accounting.journal-entries')->middleware(['role:admin,accountant', 'permission:finance.view']);
-    Route::get('/accounting/trial-balance', [AccountingController::class, 'trialBalance'])->name('accounting.trial-balance')->middleware(['role:admin,accountant', 'permission:finance.view']);
-    Route::get('/accounting/financial-statements', [AccountingController::class, 'financialStatements'])->name('accounting.financial-statements')->middleware(['role:admin,accountant', 'permission:finance.view']);
-    Route::get('/accounting/ledger/{account}', [AccountingController::class, 'ledger'])->name('accounting.ledger')->middleware(['role:admin,accountant', 'permission:finance.view']);
-    Route::get('/accounting/aging-report', [AccountingController::class, 'agingReport'])->name('accounting.aging-report')->middleware(['role:admin,accountant', 'permission:finance.view']);
-    Route::get('/accounting/cash-flow', [AccountingController::class, 'cashFlow'])->name('accounting.cash-flow')->middleware(['role:admin,accountant', 'permission:finance.view']);
+    // Accounting (Permission-based access)
+    Route::get('/accounting', [AccountingController::class, 'index'])->name('accounting.index')->middleware(['permission:accounting.view,accounting.manage,accounting.reports,finance.view']);
+    Route::get('/accounting/journal-entries', [AccountingController::class, 'journalEntries'])->name('accounting.journal-entries')->middleware(['permission:accounting.view,accounting.manage,accounting.journal,finance.view']);
+    Route::get('/accounting/trial-balance', [AccountingController::class, 'trialBalance'])->name('accounting.trial-balance')->middleware(['permission:accounting.view,accounting.manage,accounting.reports,finance.view']);
+    Route::get('/accounting/financial-statements', [AccountingController::class, 'financialStatements'])->name('accounting.financial-statements')->middleware(['permission:accounting.view,accounting.manage,accounting.reports,finance.view']);
+    Route::get('/accounting/ledger/{account}', [AccountingController::class, 'ledger'])->name('accounting.ledger')->middleware(['permission:accounting.view,accounting.manage,finance.view']);
+    Route::get('/accounting/aging-report', [AccountingController::class, 'agingReport'])->name('accounting.aging-report')->middleware(['permission:accounting.view,accounting.manage,accounting.reports,finance.view']);
+    Route::get('/accounting/cash-flow', [AccountingController::class, 'cashFlow'])->name('accounting.cash-flow')->middleware(['permission:accounting.view,accounting.manage,accounting.reports,finance.view']);
     
     // Chart of Accounts CRUD (Consumed by Vue/Alpine)
-    Route::get('/accounting/chart-of-accounts', [AccountingController::class, 'index'])->middleware('role:admin,accountant');
-    Route::post('/accounting/chart-of-accounts', [AccountingController::class, 'store'])->middleware('role:admin,accountant');
-    Route::put('/accounting/chart-of-accounts/{chartOfAccount}', [AccountingController::class, 'updateAccount'])->middleware('role:admin,accountant');
-    Route::post('/accounting/chart-of-accounts/{chartOfAccount}/toggle-active', [AccountingController::class, 'toggleAccountActive'])->middleware('role:admin,accountant');
-    Route::delete('/accounting/chart-of-accounts/{chartOfAccount}', [AccountingController::class, 'destroyAccount'])->middleware('role:admin,accountant');
+    Route::get('/accounting/chart-of-accounts', [AccountingController::class, 'index'])->middleware('permission:accounting.view,accounting.manage');
+    Route::post('/accounting/chart-of-accounts', [AccountingController::class, 'store'])->middleware('permission:accounting.manage');
+    Route::put('/accounting/chart-of-accounts/{chartOfAccount}', [AccountingController::class, 'updateAccount'])->middleware('permission:accounting.manage');
+    Route::post('/accounting/chart-of-accounts/{chartOfAccount}/toggle-active', [AccountingController::class, 'toggleAccountActive'])->middleware('permission:accounting.manage');
+    Route::delete('/accounting/chart-of-accounts/{chartOfAccount}', [AccountingController::class, 'destroyAccount'])->middleware('permission:accounting.manage');
 
     // Transfers (Accounting)
-    Route::get('/accounting/transfers/create', [App\Http\Controllers\Accounting\TransferController::class, 'create'])->name('accounting.transfers.create')->middleware(['role:admin,accountant']);
-    Route::post('/accounting/transfers', [App\Http\Controllers\Accounting\TransferController::class, 'store'])->name('accounting.transfers.store')->middleware(['role:admin,accountant']);
+    Route::get('/accounting/transfers/create', [App\Http\Controllers\Accounting\TransferController::class, 'create'])->name('accounting.transfers.create')->middleware(['permission:accounting.view,accounting.manage']);
+    Route::post('/accounting/transfers', [App\Http\Controllers\Accounting\TransferController::class, 'store'])->name('accounting.transfers.store')->middleware(['permission:accounting.manage']);
 
     // Stock Transfers (Inventory / Consignment)
     Route::get('/stock-transfers', [App\Http\Controllers\StockTransferController::class, 'view'])->name('stock-transfers.index')->middleware('role:admin,staff');
@@ -280,7 +282,7 @@ Route::middleware('auth')->group(function () {
     // Capital Investment
     Route::post('/accounting/capital-investment', [AccountingController::class, 'storeCapitalInvestment'])->name('accounting.capital-investment')->middleware('role:admin,accountant');
     
-    // Expenses (Accountant & Admin)
+    // Expenses (Accountant & Admin Only - Staff should NOT see company expenses)
     Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index')->middleware(['role:admin,accountant', 'permission:finance.view']);
     Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store')->middleware(['role:admin,accountant']);
     Route::put('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update')->middleware(['role:admin,accountant']);
@@ -311,12 +313,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/budgets/{budget}/export', [App\Http\Controllers\BudgetController::class, 'export'])->name('budgets.export')->middleware('role:admin,accountant');
     Route::resource('budgets', App\Http\Controllers\BudgetController::class)->middleware(['role:admin,accountant', 'permission:finance.view']);
 
-    // Reports & Analytics
+    // Reports & Analytics (Admin & Accountant Only - Contains financial intelligence)
     Route::get('/reports', [App\Http\Controllers\ReportsController::class, 'index'])->name('reports.index')->middleware(['role:admin,accountant', 'permission:reports.view']);
     Route::get('/reports/sales', [App\Http\Controllers\ReportsController::class, 'sales'])->name('reports.sales')->middleware(['role:admin,accountant', 'permission:reports.view']);
     Route::get('/reports/inventory', [App\Http\Controllers\ReportsController::class, 'inventory'])->name('reports.inventory')->middleware(['role:admin,accountant', 'permission:reports.view']);
     Route::get('/reports/deep-analysis', [App\Http\Controllers\ReportsController::class, 'deepAnalysis'])->name('reports.deep-analysis')->middleware(['role:admin,accountant', 'permission:reports.view']);
-    Route::post('/reports/ai-summary', [App\Http\Controllers\ReportsController::class, 'aiSummary'])->name('reports.ai-summary')->middleware(['role:admin,accountant', 'permission:reports.view']);
+    Route::match(['get', 'post'], '/reports/ai-summary', [App\Http\Controllers\ReportsController::class, 'aiSummary'])->name('reports.ai-summary')->middleware(['permission:reports.view,reports.analytics,finance.view']);
     Route::post('/reports/chat', [App\Http\Controllers\ReportsController::class, 'chat'])->name('reports.chat')->middleware(['role:admin,accountant', 'permission:reports.view']);
     // New Financial Reports
     Route::get('/reports/profit-loss', [App\Http\Controllers\Reports\ProfitLossController::class, 'index'])->name('reports.profit-loss')->middleware(['role:admin,accountant', 'permission:reports.view']);
@@ -335,7 +337,7 @@ Route::middleware('auth')->group(function () {
     // Packages / Procedure Bundles
     Route::get('/api/packages/{package}/details', [App\Http\Controllers\PackageController::class, 'getDetails'])->name('api.packages.details')->middleware('auth');
     Route::get('/api/packages/{package}/details', [App\Http\Controllers\PackageController::class, 'getDetails'])->name('api.packages.details')->middleware('auth');
-    Route::resource('packages', App\Http\Controllers\PackageController::class)->middleware('role:admin,accountant');
+    Route::resource('packages', App\Http\Controllers\PackageController::class)->middleware('role:admin,accountant,staff');
 
     // Commissions
     Route::resource('commissions', App\Http\Controllers\CommissionController::class)->only(['index', 'store', 'update'])->middleware('role:admin,accountant,staff');

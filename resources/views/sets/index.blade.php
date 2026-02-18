@@ -45,7 +45,7 @@
                     <div class="ml-5 w-0 flex-1">
                         <dt class="text-sm font-medium text-gray-500 truncate">Ready for Surgery</dt>
                         <dd class="text-2xl font-semibold text-gray-900">
-                            {{ $sets->where('status', 'Complete')->count() }}
+                            {{ $sets->where('status', 'available')->count() }}
                         </dd>
                     </div>
                 </div>
@@ -60,9 +60,9 @@
                         <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
                     </div>
                     <div class="ml-5 w-0 flex-1">
-                        <dt class="text-sm font-medium text-gray-500 truncate">Incomplete / Restock</dt>
+                        <dt class="text-sm font-medium text-gray-500 truncate">Not Available / In Use</dt>
                         <dd class="text-2xl font-semibold text-gray-900">
-                            {{ $sets->where('status', '!=', 'Complete')->count() }}
+                            {{ $sets->where('status', '!=', 'available')->count() }}
                         </dd>
                     </div>
                 </div>
@@ -77,12 +77,41 @@
             <div class="p-6 flex-1">
                 <div class="flex justify-between items-start mb-4">
                     <div>
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $set->status === 'Complete' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                            {{ $set->status === 'Complete' ? 'Ready' : 'Incomplete' }}
+                        @php
+                            $statusColors = [
+                                'available' => 'bg-green-100 text-green-800',
+                                'dispatched' => 'bg-blue-100 text-blue-800',
+                                'in_surgery' => 'bg-indigo-100 text-indigo-800',
+                                'in_transit' => 'bg-yellow-100 text-yellow-800',
+                                'dirty' => 'bg-red-100 text-red-800',
+                                'sterilizing' => 'bg-orange-100 text-orange-800',
+                                'maintenance' => 'bg-gray-100 text-gray-800',
+                                'incomplete' => 'bg-red-50 text-red-600',
+                            ];
+                            $color = $statusColors[$set->status] ?? 'bg-gray-100 text-gray-800';
+                        @endphp
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ $color }}">
+                            {{ ucfirst(str_replace('_', ' ', $set->status)) }}
                         </span>
+                        @if($set->sterilization_status == 'sterile')
+                             <span class="ml-1 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200">
+                                <i class="fas fa-sparkles mr-1"></i> Sterile
+                            </span>
+                        @endif
                     </div>
                     <div class="text-gray-400">
-                        <i class="fas fa-barcode"></i>
+                         <!-- Simple Status Update Request -->
+                         <form action="{{ route('sets.status.update', $set->id) }}" method="POST" class="inline-block">
+                            @csrf
+                            @method('PUT')
+                            <select name="status" onchange="this.form.submit()" class="text-xs py-0 pl-2 pr-6 border-gray-200 rounded text-gray-600 focus:ring-indigo-500 focus:border-indigo-500 bg-transparent hover:bg-gray-50 cursor-pointer" title="Quick Update Status">
+                                <option value="" disabled>Change Status...</option>
+                                <option value="available" {{ $set->status == 'available' ? 'selected' : '' }}>Available</option>
+                                <option value="dirty" {{ $set->status == 'dirty' ? 'selected' : '' }}>Dirty</option>
+                                <option value="sterilizing" {{ $set->status == 'sterilizing' ? 'selected' : '' }}>Sterilizing</option>
+                                <option value="maintenance" {{ $set->status == 'maintenance' ? 'selected' : '' }}>Maintenance</option>
+                            </select>
+                        </form>
                     </div>
                 </div>
                 

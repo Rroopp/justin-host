@@ -1,7 +1,142 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="min-h-screen bg-gray-50 py-8 font-sans">
+<style>
+    /* Professional Print Styles */
+    @media print {
+        @page {
+            size: A4;
+            margin: 15mm 12mm;
+        }
+        
+        body {
+            background: white !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        
+        .print-document {
+            max-width: 100% !important;
+            padding: 0 !important;
+        }
+        
+        /* Hide UI elements */
+        .print-hidden,
+        nav, 
+        header,
+        .sidebar,
+        .fixed {
+            display: none !important;
+        }
+        
+        /* Show print-only elements */
+        .print-only {
+            display: block !important;
+        }
+        
+        /* Professional table styling */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 10pt;
+        }
+        
+        .report-table th {
+            background-color: #1e3a5f !important;
+            color: white !important;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #1e3a5f;
+        }
+        
+        .report-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            vertical-align: top;
+        }
+        
+        .report-table tr:nth-child(even) {
+            background-color: #f8f9fa !important;
+        }
+        
+        /* Section styling */
+        .report-section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        
+        .report-section-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #1e3a5f;
+            border-bottom: 2px solid #1e3a5f;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        
+        /* KPI Cards for print */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        
+        .kpi-card {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+            background: #f8f9fa !important;
+        }
+        
+        .kpi-label {
+            font-size: 9pt;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .kpi-value {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #1e3a5f;
+        }
+        
+        /* Footer */
+        .report-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 10px;
+            margin-top: 20px;
+        }
+        
+        /* Page break utilities */
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .no-break {
+            page-break-inside: avoid;
+        }
+    }
+    
+    /* Screen-only styles */
+    @media screen {
+        .print-only {
+            display: none;
+        }
+    }
+</style>
+
+<div class="min-h-screen bg-gray-50 py-8 font-sans print-document">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         <!-- Header & Controls -->
@@ -26,7 +161,7 @@
                     </div>
                 </div>
                 
-                <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none ring-2 ring-offset-2 ring-transparent focus:ring-indigo-500 transition-all">
+                <button onclick="window.print()" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all">
                     <i class="fas fa-print mr-2 text-gray-400"></i> Print Report
                 </button>
                 
@@ -37,11 +172,31 @@
         </div>
 
         <!-- Printable Header -->
-        <div class="hidden print:block mb-8">
+        <div class="hidden print:block mb-6">
             @include('partials.document_header')
             <div class="text-center mt-4">
                 <h2 class="text-xl font-bold text-gray-900">Sales Performance Report</h2>
-                <p class="text-sm text-gray-500 mt-1">Generated: {{ now()->format('Y-m-d H:i') }} | Period: {{ $period }}</p>
+                <p class="text-sm text-gray-500 mt-1">Generated: {{ now()->format('Y-m-d H:i') }} | Period: {{ $start_date->format('M d, Y') }} - {{ $end_date->format('M d, Y') }}</p>
+            </div>
+        </div>
+        
+        <!-- Print-only KPI Summary -->
+        <div class="hidden print:block kpi-grid mb-6">
+            <div class="kpi-card">
+                <div class="kpi-label">Total Revenue</div>
+                <div class="kpi-value">KES {{ number_format($total_sales, 0) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Net Profit</div>
+                <div class="kpi-value">KES {{ number_format($net_profit, 0) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Transactions</div>
+                <div class="kpi-value">{{ number_format($transaction_count) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Avg Order</div>
+                <div class="kpi-value">KES {{ $transaction_count > 0 ? number_format($total_sales / $transaction_count, 0) : 0 }}</div>
             </div>
         </div>
 
@@ -303,12 +458,19 @@
     </div>
 </div>
 
+@php
+    $revenueLabels = $sales_data->pluck('date')->map(function($d) { return \Carbon\Carbon::parse($d)->format('M d'); });
+    $categoryLabels = $category_data->pluck('category');
+    $paymentLabels = $payment_trends->pluck('payment_method');
+    $peakLabels = $peak_times->pluck('hour')->map(function($h) { return $h . ':00'; });
+@endphp
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // Common Chart Options
     Chart.defaults.font.family = "'Inter', system-ui, -apple-system, sans-serif";
     Chart.defaults.color = '#6b7280';
-    
+
     // 1. Revenue Chart (Gradient Area)
     const ctxRevenue = document.getElementById('revenueChart').getContext('2d');
     const gradientRevenue = ctxRevenue.createLinearGradient(0, 0, 0, 400);
@@ -318,7 +480,7 @@
     new Chart(ctxRevenue, {
         type: 'line',
         data: {
-            labels: @json($sales_data->pluck('date')->map(fn($d) => \Carbon\Carbon::parse($d)->format('M d'))),
+            labels: @json($revenueLabels),
             datasets: [{
                 label: 'Revenue',
                 data: @json($sales_data->pluck('total')),
@@ -366,7 +528,7 @@
     new Chart(document.getElementById('categoryChart'), {
         type: 'doughnut',
         data: {
-            labels: @json($category_data->pluck('category')),
+            labels: @json($categoryLabels),
             datasets: [{
                 data: @json($category_data->pluck('total')),
                 backgroundColor: ['#4f46e5', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'],
@@ -388,7 +550,7 @@
     new Chart(document.getElementById('paymentChart'), {
         type: 'pie',
         data: {
-            labels: @json($payment_trends->pluck('payment_method')),
+            labels: @json($paymentLabels),
             datasets: [{
                 data: @json($payment_trends->pluck('total')),
                 backgroundColor: ['#10b981', '#f59e0b', '#6366f1', '#ef4444'],
@@ -407,7 +569,7 @@
     new Chart(document.getElementById('peakChart'), {
         type: 'bar',
         data: {
-            labels: @json($peak_times->pluck('hour')->map(fn($h) => $h . ':00')),
+            labels: @json($peakLabels),
             datasets: [{
                 label: 'Transactions',
                 data: @json($peak_times->pluck('count')),
@@ -455,4 +617,10 @@
         }
     }
 </script>
+
+<!-- Print Footer -->
+<div class="hidden print:block report-footer mt-8 pt-4">
+    <p>Generated by {{ settings('company_name', 'JASTENE MEDICAL LTD') }} • {{ now()->format('F d, Y H:i') }}</p>
+    <p class="text-xs mt-1">This is a confidential business report. Distribution without authorization is prohibited.</p>
+</div>
 @endsection

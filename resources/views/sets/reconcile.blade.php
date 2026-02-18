@@ -7,7 +7,7 @@
         <p class="text-gray-600">Processing return for <strong>{{ $set->name }}</strong> from Case #{{ $reservation->id }}</p>
     </div>
 
-    <form action="{{ route('reconcile.store', $reservation->id) }}" method="POST" class="bg-white shadow rounded-lg p-6">
+    <form action="{{ route('reconcile.store', $reservation->id) }}" method="POST" class="bg-white shadow rounded-lg p-6" onsubmit="document.getElementById('reconcile-btn').disabled = true; document.getElementById('reconcile-btn').innerText = 'Processing...';">
         @csrf
         <input type="hidden" name="surgical_set_id" value="{{ $set->id }}">
 
@@ -70,9 +70,10 @@
 
         <div class="flex justify-end gap-3">
             <a href="{{ route('reservations.show', $reservation->id) }}" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</a>
-            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 shadow-sm">
+            <button type="submit" id="reconcile-btn" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 shadow-sm">
                 Complete Return & Reconcile
             </button>
+
         </div>
     </form>
 </div>

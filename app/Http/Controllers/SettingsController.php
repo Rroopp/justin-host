@@ -210,6 +210,10 @@ class SettingsController extends Controller
             ['key' => 'module_reports_enabled', 'value' => '1', 'category' => 'modules', 'setting_type' => 'boolean'],
             ['key' => 'module_suppliers_enabled', 'value' => '1', 'category' => 'modules', 'setting_type' => 'boolean'],
             ['key' => 'module_customers_enabled', 'value' => '1', 'category' => 'modules', 'setting_type' => 'boolean'],
+            
+            // Feature Flags (for safe rollout of new features)
+            ['key' => 'auto_post_surgery_cogs', 'value' => '0', 'category' => 'system', 'setting_type' => 'boolean', 'description' => 'Automatically post COGS when surgery implants are used'],
+            ['key' => 'auto_bill_consignment', 'value' => '0', 'category' => 'system', 'setting_type' => 'boolean', 'description' => 'Automatically generate invoices for used consignment items'],
         ];
 
         foreach ($defaults as $setting) {
@@ -478,7 +482,11 @@ class SettingsController extends Controller
             ->orderBy('full_name')
             ->get(['id', 'full_name', 'role', 'permissions', 'designation']);
 
-        return response()->json($staffMembers);
+        return response()->json([
+            'staff' => $staffMembers,
+            'defaults' => config('permissions.defaults', []),
+            'admin_level' => config('permissions.admin_level', []),
+        ]);
     }
 
     /**

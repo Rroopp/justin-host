@@ -7,8 +7,11 @@ use App\Models\SurgeryUsageItem;
 use App\Models\Location;
 use App\Models\Inventory;
 use App\Models\Batch;
+use App\Services\SurgeryAccountingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SurgeryUsageController extends Controller
 {
@@ -59,7 +62,7 @@ class SurgeryUsageController extends Controller
                 'surgeon_name' => $validated['surgeon_name'],
                 'facility_name' => $validated['facility_name'],
                 'set_location_id' => $validated['set_location_id'],
-                'user_id' => auth()->id(),
+                'user_id' => Auth::id(),
             ]);
 
             foreach ($validated['items'] as $item) {
@@ -100,6 +103,25 @@ class SurgeryUsageController extends Controller
                     'batch_id' => $item['batch_id'],
                     'quantity' => $item['quantity'],
                     'from_set' => $item['from_set'] ?? false,
+                ]);
+            }
+
+            // Post COGS to accounting (feature-flagged, safe to call always)
+            try {
+                $accountingService = new SurgeryAccountingService();
+                $journalEntry = $accountingService->recordSurgeryCogs($usage, null, Auth::user());
+                
+                if ($journalEntry) {
+                    Log::info('SurgeryUsageController: COGS posted', [
+                        'surgery_usage_id' => $usage->id,
+                        'journal_entry_id' => $journalEntry->id
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Log but don't fail the request - accounting can be reconciled later
+                Log::error('SurgeryUsageController: Failed to post COGS', [
+                    'surgery_usage_id' => $usage->id,
+                    'error' => $e->getMessage()
                 ]);
             }
 

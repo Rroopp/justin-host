@@ -802,7 +802,9 @@ window.settingsManager = function() {
         async loadPermissions() {
             try {
                 const res = await axios.get('/settings/permissions');
-                this.staffMembers = res.data;
+                this.staffMembers = res.data.staff || [];
+                this.permissionDefaults = res.data.defaults || {};
+                this.adminLevelPermissions = res.data.admin_level || [];
             } catch (error) {
                 // If 403, just ignore (not admin)
                 if (error.response && error.response.status !== 403) {
@@ -818,18 +820,68 @@ window.settingsManager = function() {
             this.initialPermissions = [...this.selectedStaffPermissions];
         },
 
+        // Check if a permission is a default for the selected staff's role
+        isDefaultPermission(permission) {
+            if (!this.selectedStaff) return false;
+            const defaults = this.permissionDefaults?.[this.selectedStaff.role] || [];
+            return defaults.includes(permission);
+        },
+
+        // Check if a permission is admin-level
+        isAdminLevelPermission(permission) {
+            return this.adminLevelPermissions?.includes(permission) ?? false;
+        },
+
+        // Reset permissions to role defaults
+        resetToDefaults() {
+            if (!this.selectedStaff) return;
+            const defaults = this.permissionDefaults?.[this.selectedStaff.role] || [];
+            this.selectedStaffPermissions = [...defaults];
+        },
+
+        // Grant all permissions
+        grantAllPermissions() {
+            const allPermissions = [
+                'inventory.view', 'inventory.edit', 'inventory.adjust', 'inventory.categories', 'inventory.batches',
+                'pos.access', 'pos.discount', 'sales.view', 'sales.refund', 'sales.invoices',
+                'reports.view', 'finance.view', 'reports.analytics',
+                'accounting.view', 'accounting.manage', 'accounting.reports', 'accounting.journal', 'accounting.periods',
+                'payroll.view', 'payroll.process', 'payroll.deductions', 'payroll.reimbursements',
+                'banking.view', 'banking.manage', 'banking.reconcile',
+                'suppliers.view', 'suppliers.manage', 'customers.view', 'customers.manage',
+                'orders.create', 'orders.approve', 'rentals.view', 'rentals.manage',
+                'budgets.view', 'budgets.manage', 'budgets.approve',
+                'consignments.view', 'consignments.manage', 'consignments.settle',
+                'stock.view', 'stock.create', 'stock.transfers.view', 'stock.transfers.manage',
+                'expenses.view', 'expenses.manage',
+                'commissions.view', 'commissions.manage',
+                'assets.view', 'assets.manage',
+                'surgery.view', 'surgery.manage',
+                'packages.view', 'packages.manage',
+                'documents.view', 'documents.manage',
+                'audit.view', 'audit.manage',
+                'settings.view', 'settings.manage', 'settings.company', 'settings.users'
+            ];
+            this.selectedStaffPermissions = [...allPermissions];
+        },
+
+        // Clear all permissions
+        clearAllPermissions() {
+            this.selectedStaffPermissions = [];
+        },
+
         async savePermissions() {
             if (!this.selectedStaff) return;
-            
+
             try {
                 const res = await axios.put(`/settings/permissions/${this.selectedStaff.id}`, {
                     permissions: this.selectedStaffPermissions
                 });
-                
+
                 // Update local state
                 this.selectedStaff.permissions = res.data.permissions;
                 this.initialPermissions = [...res.data.permissions];
-                
+
                 alert(`Permissions updated for ${this.selectedStaff.full_name}`);
                 await this.loadAudit();
             } catch (error) {

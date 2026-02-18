@@ -17,6 +17,11 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         
+        // Redirect staff to their dedicated dashboard
+        if ($user->role === 'staff') {
+            return redirect()->route('staff.dashboard');
+        }
+        
         // Today's sales query (initialize before role check)
         $todaySales = PosSale::whereDate('created_at', today());
         

@@ -341,51 +341,40 @@ class CaseReservationController extends Controller
                          $batch = Batch::lockForUpdate()->find($item->batch_id);
                     }
                     
-                    // Deduct for Sale
-                    if ($batch) {
-                        if ($batch->quantity < $usedQty) {
-                            throw new \Exception("Detailed stock error: Batch {$batch->batch_number} has {$batch->quantity}, trying to use {$usedQty}. This shouldn't happen after release.");
+                    // Deduct for Sale & Log Movement
+                    if ($product->type !== 'service') {
+                        // Check batch if assigned
+                        $batch = ($item->batch_id) ? Batch::lockForUpdate()->find($item->batch_id) : null;
+                        
+                        if ($batch && $batch->quantity < $usedQty) {
+                             throw new \Exception("Detailed stock error: Batch {$batch->batch_number} has {$batch->quantity}, trying to use {$usedQty}.");
                         }
 
+                        // Prepare Base Movement Data
                         $movementData = [
                             'inventory_id' => $item->inventory_id,
-                            'batch_id' => $item->batch_id,
+                            'batch_id' => $batch ? $batch->id : null,
                             'movement_type' => 'sale',
                             'quantity' => -1 * $usedQty,
-                            'quantity_before' => $batch->quantity,
-                            'quantity_after' => $batch->quantity - $usedQty,
-                            'from_location_id' => $batch->location_id,
-                            'reference_type' => 'case_reservation', // Or 'pos_sale' if we link it to the sale ID later
+                            'reference_type' => 'case_reservation',
                             'reference_id' => $reservation->id,
-                            'unit_cost' => $batch->cost_price,
                             'notes' => "Used in Case: {$reservation->case_number}",
+                            'unit_cost' => $batch ? $batch->cost_price : ($product->moving_average_cost ?? $product->purchase_price ?? 0),
                         ];
-    
-                        $batch->decrement('quantity', $usedQty);
-                        InventoryMovement::logMovement($movementData);
-                    } else {
-                        // Service Item logic or non-batched
-                        if ($product->type !== 'service') {
+
+                        if ($batch) {
+                            $movementData['quantity_before'] = $batch->quantity;
+                            $movementData['quantity_after'] = $batch->quantity - $usedQty;
+                            $movementData['from_location_id'] = $batch->location_id;
+                            
+                            $batch->decrement('quantity', $usedQty);
+                        } else {
+                            $movementData['quantity_before'] = $product->quantity_in_stock;
+                            $movementData['quantity_after'] = $product->quantity_in_stock - $usedQty;
+                            
                             $product->decrement('quantity_in_stock', $usedQty);
                         }
-                    }
-                    // Stock Management
-                    if ($product->type !== 'service') {
-                        // Check stock availability
-                        // Ideally checking was done before, but here we are manual. 
-                        
-                        // We use batch logic only for physical items
-                         if ($item->batch_id) {
-                            $batch = Batch::find($item->batch_id);
-                             if ($batch) {
-                                $batch->decrement('quantity', $usedQty);
-                             } else {
-                                $product->decrement('quantity_in_stock', $usedQty);
-                             }
-                         } else {
-                             $product->decrement('quantity_in_stock', $usedQty); 
-                         }
-                        
+
                         InventoryMovement::logMovement($movementData);
                     }
 
@@ -436,6 +425,14 @@ class CaseReservationController extends Controller
                     'payment_status' => 'pending',
                     'sale_status' => 'completed',
                     'notes' => "Generated from Case: {$reservation->case_number}. Surgeon: {$reservation->surgeon_name}",
+                    
+                    // Patient & Case Info
+                    'patient_name' => $reservation->patient_name,
+                    'patient_number' => $reservation->patient_id,
+                    'surgeon_name' => $reservation->surgeon_name,
+                    'case_number' => $reservation->case_number,
+                    'facility_name' => $reservation->customer ? $reservation->customer->name : null,
+                    'patient_type' => 'Inpatient', // Default for surgery cases? Or leave null if unsure. 
                 ]);
 
                 // Link case to sale (if column exists, or just via notes/logic)
@@ -554,29 +551,33 @@ class CaseReservationController extends Controller
                         'type' => 'product',
                         'name' => $item->product_name,
                         'code' => $item->code,
-                        'available_stock' => $item->quantity_in_stock, // Inventory model uses quantity_in_stock
+                        // Show "Unlimited" for services, otherwise show actual stock
+                        'available_stock' => $item->type === 'service' ? 'Unlimited' : $item->quantity_in_stock,
                         'batches' => $item->batches,
                         'display_name' => $item->product_name
                     ];
                 });
         }
 
-        // 2. Sets (Locations where type='set')
+        // 2. Sets (Surgical Sets)
         $sets = collect([]);
         if (!$type || $type === 'set') {
             // Sets usually don't adhere to 'category' filter unless we map it.
             // For now, if category is selected, we might skip sets OR show them if they match name.
             if (!$request->filled('category') || $type === 'set') {
-                $q = Location::where('type', 'set');
+                $q = SurgicalSet::with('location', 'instruments');
                 if ($search) {
                     $q->where('name', 'like', "%{$search}%");
                 }
                 $sets = $q->limit(10)
-                    ->get()
+                        ->whereNotNull('location_id') // Exclude orphaned sets
+                        ->get()
                     ->map(function ($set) {
-                        $itemCount = SetContent::where('location_id', $set->id)->count();
+                        if (!$set->location) return null;
+                        
+                        $itemCount = $set->instruments->count();
                         return [
-                            'id' => $set->id,
+                            'id' => $set->location_id, // Use Location ID for addSet compatibility
                             'type' => 'set',
                             'name' => $set->name,
                             'code' => 'SET',
@@ -584,7 +585,7 @@ class CaseReservationController extends Controller
                             'batches' => [],
                             'display_name' => '[SET] ' . $set->name . " ($itemCount items)"
                         ];
-                    });
+                    })->filter();
             }
         }
 

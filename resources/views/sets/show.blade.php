@@ -1,11 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SURGICAL SET DASHBOARD - {{ $set->name }}</title>
+@extends('layouts.app')
+
+@section('content')
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
     <style>
-        :root {
+        .set-dashboard {
             --blue:#1976d2;
             --red:#d32f2f;
             --green:#2e7d32;
@@ -15,9 +13,6 @@
             --border:#ddd;
             --bgSoft:#f5f5f5;
         }
-        body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; color: var(--fg); margin: 0; background:#f0f2f5; }
-        
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         
         /* Header Card */
         .header-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; border-left: 5px solid var(--blue); }
@@ -33,34 +28,32 @@
         /* Sections */
         .section-title { font-size: 16px; font-weight: 700; color: #444; margin: 30px 0 10px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #ddd; padding-bottom: 5px; }
         
-        .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 20px; }
+        .set-card { background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); overflow: hidden; margin-bottom: 20px; }
         
         /* Tables */
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #f8f9fa; text-align: left; padding: 10px 15px; font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; border-bottom: 1px solid #eee; }
-        td { padding: 10px 15px; border-bottom: 1px solid #eee; font-size: 13px; }
-        tr:last-child td { border-bottom: none; }
+        .set-table { width: 100%; border-collapse: collapse; }
+        .set-table th { background: #f8f9fa; text-align: left; padding: 10px 15px; font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; border-bottom: 1px solid #eee; }
+        .set-table td { padding: 10px 15px; border-bottom: 1px solid #eee; font-size: 13px; }
+        .set-table tr:last-child td { border-bottom: none; }
         
         .qty-badge { background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 11px; }
         .missing-row { background-color: #ffebee; }
         
         /* Buttons */
-        .btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background 0.2s; text-decoration: none; display: inline-block; }
-        .btn-primary { background: var(--blue); color: #fff; }
-        .btn-primary:hover { background: #1565c0; }
-        .btn-secondary { background: #fff; border: 1px solid #ccc; color: #333; }
-        .btn-secondary:hover { background: #f5f5f5; }
+        .set-btn { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: background 0.2s; text-decoration: none; display: inline-block; }
+        .set-btn-primary { background: var(--blue); color: #fff; }
+        .set-btn-primary:hover { background: #1565c0; }
+        .set-btn-secondary { background: #fff; border: 1px solid #ccc; color: #333; }
+        .set-btn-secondary:hover { background: #f5f5f5; }
 
         @media print {
-            body { background: #fff; }
-            .container { padding: 0; max-width: 100%; }
-            .header-card, .card { box-shadow: none; border: 1px solid #ccc; }
-            .btn { display: none; }
+            .set-dashboard { background: #fff; }
+            .header-card, .set-card { box-shadow: none; border: 1px solid #ccc; }
+            .set-btn { display: none; }
         }
     </style>
-</head>
-<body>
-    <div class="container">
+    
+    <div class="set-dashboard">
         
         <!-- Header -->
         <div class="header-card">
@@ -87,9 +80,17 @@
             </div>
             
             <div style="margin-top: 15px; display:flex; gap: 10px;">
-                <a href="{{ route('sets.index') }}" class="btn btn-secondary">← Back to Sets</a>
-                <button class="btn btn-secondary" onclick="window.print()">Print Dashboard</button>
-                <a href="{{ route('reservations.index') }}" class="btn btn-primary">Dispatch via Case</a>
+                <a href="{{ route('sets.index') }}" class="set-btn set-btn-secondary">← Back to Sets</a>
+                <button class="set-btn set-btn-secondary" onclick="window.print()">Print Dashboard</button>
+                <a href="{{ route('reservations.index') }}" class="set-btn set-btn-primary">Dispatch via Case</a>
+                
+                @if(auth()->user()->hasRole('admin'))
+                <form action="{{ route('sets.destroy', $set->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this surgical set? This action cannot be undone and will delete the associated location and asset.');" style="display:inline;">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="set-btn set-btn-secondary" style="color:var(--red); border-color:var(--red);">Delete Set</button>
+                </form>
+                @endif
             </div>
         </div>
 
@@ -98,8 +99,8 @@
             <!-- 1. INSTRUMENTS (Fixed Assets) -->
             <div>
                 <div class="section-title">🛑 Instruments (Fixed Assets)</div>
-                <div class="card">
-                    <table>
+                <div class="set-card">
+                    <table class="set-table">
                         <thead>
                             <tr>
                                 <th>Instrument Name</th>
@@ -140,8 +141,8 @@
             <!-- 2. CONSUMABLES (Inventory) -->
             <div>
                 <div class="section-title">📦 Consumables Stock (Live)</div>
-                <div class="card">
-                    <table>
+                <div class="set-card">
+                    <table class="set-table">
                         <thead>
                             <tr>
                                 <th>Product</th>
@@ -175,10 +176,13 @@
                         </tbody>
                     </table>
                     
+                    @php
+                    $restockUrl = route('stock-transfers.create', ['set_id' => $set->id]);
+                    @endphp
                     @if($contents->sum('missing_quantity') > 0)
                     <div style="padding: 10px; text-align:center; border-top: 1px solid #eee;">
-                         <button class="btn btn-secondary" style="width:100%; border-color:var(--red); color:var(--red);" 
-                                 onclick="window.location.href='{{ route('stock-transfers.create') }}?set_id={{ $set->id }}'">
+                         <button class="set-btn set-btn-secondary" style="width:100%; border-color:var(--red); color:var(--red);" 
+                                 onclick="window.location.href='{{ $restockUrl }}'">
                              ⚡ Restock Missing Items
                          </button>
                     </div>
@@ -189,8 +193,8 @@
 
         <!-- 3. ADDITIONAL INVENTORY (Not in Template) -->
         <div class="section-title">➕ Additional Inventory (Extra Items Loaded)</div>
-        <div class="card">
-             <table>
+        <div class="set-card">
+             <table class="set-table">
                 <thead>
                     <tr>
                         <th>Product</th>
@@ -221,5 +225,5 @@
         </div>
 
     </div>
-</body>
-</html>
+</div>
+@endsection

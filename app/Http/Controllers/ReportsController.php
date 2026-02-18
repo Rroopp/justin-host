@@ -144,55 +144,69 @@ class ReportsController extends Controller
 
     public function aiSummary(Request $request)
     {
-        $period = $request->get('period', 'last_30_days');
-        $type = $request->get('type', 'general'); // Standardize on 'type' vs 'deep' flag
-        
-        if ($period === 'custom' && $request->has(['start', 'end'])) {
-            $dates = [
-                'start' => Carbon::parse($request->get('start'))->startOfDay(),
-                'end' => Carbon::parse($request->get('end'))->endOfDay()
-            ];
-        } else {
-            $dates = $this->getDateRange($period);
-        }
-
-        if ($type === 'expense') {
-            // Fetch Expense Data for AI Context
-            $expenses = Expense::whereBetween('date', [$dates['start'], $dates['end']])->get();
-            $byCategory = $expenses->groupBy('category')->map->sum('amount');
-            $dailyTrend = $expenses->groupBy(fn($e) => $e->date->format('Y-m-d'))->map->sum('amount');
-            $topSpenders = $byCategory->sortDesc()->take(5);
+        try {
+            $period = $request->get('period', 'last_30_days');
+            $type = $request->get('type', 'general'); // Standardize on 'type' vs 'deep' flag
             
-            // Simple Anomaly Logic for Context
-            $avg = $dailyTrend->avg();
-            $anomalies = $dailyTrend->filter(fn($val) => $val > ($avg * 2.5));
+            if ($period === 'custom' && $request->has(['start', 'end'])) {
+                $dates = [
+                    'start' => Carbon::parse($request->get('start'))->startOfDay(),
+                    'end' => Carbon::parse($request->get('end'))->endOfDay()
+                ];
+            } else {
+                $dates = $this->getDateRange($period);
+            }
 
-            $summary = $this->aiService->generateExpenseAnalysis($period, $dates['start'], $dates['end'], [
-                'total_expense' => $expenses->sum('amount'),
-                'period_revenue_approx' => PosSale::whereBetween('created_at', [$dates['start'], $dates['end']])->sum('total'),
-                'top_categories' => $topSpenders,
-                'daily_trend_summary' => ['avg' => $avg, 'peak' => $dailyTrend->max()],
-                'anomalies' => $anomalies
-            ]);
-        } elseif ($request->has('deep') || $type === 'deep') {
-            $staffPerformance = $this->analyticsService->getStaffPerformance($dates['start'], $dates['end']);
-            $productProfitability = $this->analyticsService->getProductProfitability($dates['start'], $dates['end']);
-            $customerInsights = $this->analyticsService->getCustomerInsights($dates['start'], $dates['end']);
-            $peakTimes = $this->analyticsService->getPeakSalesTimes($dates['start'], $dates['end']);
+            // Check if AI service is configured
+            if (!config('services.gemini.key')) {
+                return response()->json([
+                    'html' => '<div class="p-4 bg-yellow-50 border border-yellow-200 rounded"><p class="text-yellow-800"><strong>AI Service Not Configured:</strong> Please set the GEMINI_API_KEY in your .env file.</p></div>'
+                ]);
+            }
+
+            if ($type === 'expense') {
+                // Fetch Expense Data for AI Context
+                $expenses = Expense::whereBetween('date', [$dates['start'], $dates['end']])->get();
+                $byCategory = $expenses->groupBy('category')->map->sum('amount');
+                $dailyTrend = $expenses->groupBy(fn($e) => $e->date->format('Y-m-d'))->map->sum('amount');
+                $topSpenders = $byCategory->sortDesc()->take(5);
+                
+                // Simple Anomaly Logic for Context
+                $avg = $dailyTrend->avg();
+                $anomalies = $dailyTrend->filter(fn($val) => $val > ($avg * 2.5));
+
+                $summary = $this->aiService->generateExpenseAnalysis($period, $dates['start'], $dates['end'], [
+                    'total_expense' => $expenses->sum('amount'),
+                    'period_revenue_approx' => PosSale::whereBetween('created_at', [$dates['start'], $dates['end']])->sum('total'),
+                    'top_categories' => $topSpenders,
+                    'daily_trend_summary' => ['avg' => $avg, 'peak' => $dailyTrend->max()],
+                    'anomalies' => $anomalies
+                ]);
+            } elseif ($request->has('deep') || $type === 'deep') {
+                $staffPerformance = $this->analyticsService->getStaffPerformance($dates['start'], $dates['end']);
+                $productProfitability = $this->analyticsService->getProductProfitability($dates['start'], $dates['end']);
+                $customerInsights = $this->analyticsService->getCustomerInsights($dates['start'], $dates['end']);
+                $peakTimes = $this->analyticsService->getPeakSalesTimes($dates['start'], $dates['end']);
+                
+                $summary = $this->aiService->generateDeepAnalysis($period, $dates['start'], $dates['end'], [
+                    'staff' => $staffPerformance,
+                    'products' => $productProfitability,
+                    'customers' => $customerInsights,
+                    'peak_times' => $peakTimes
+                ]);
+            } else {
+                $summary = $this->aiService->generateExecutiveSummary($period, $dates['start'], $dates['end']);
+            }
             
-            $summary = $this->aiService->generateDeepAnalysis($period, $dates['start'], $dates['end'], [
-                'staff' => $staffPerformance,
-                'products' => $productProfitability,
-                'customers' => $customerInsights,
-                'peak_times' => $peakTimes
-            ]);
-        } else {
-            $summary = $this->aiService->generateExecutiveSummary($period, $dates['start'], $dates['end']);
-        }
-        
-        \Illuminate\Support\Facades\Log::info('ReportsController Summary', ['summary' => $summary]);
+            \Illuminate\Support\Facades\Log::info('ReportsController Summary', ['summary' => $summary]);
 
-        return response()->json(['html' => $summary]);
+            return response()->json(['html' => $summary]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('AI Summary Error', ['error' => $e->getMessage()]);
+            return response()->json([
+                'html' => '<div class="p-4 bg-red-50 border border-red-200 rounded"><p class="text-red-800"><strong>Error:</strong> ' . htmlspecialchars($e->getMessage()) . '</p></div>'
+            ], 500);
+        }
     }
 
     public function chat(Request $request)

@@ -92,7 +92,7 @@
                                 </a>
 
                                 <!-- POS -->
-                                @if(settings('module_pos_enabled', true) && auth()->user()->hasRole(['admin', 'staff']))
+                                @if(settings('module_pos_enabled', true) && auth()->user()->hasPermission('pos.access'))
                                 <a href="{{ route('pos.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('pos.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -100,6 +100,7 @@
                                     <span class="ml-3 nav-text">POS</span>
                                 </a>
                                 <!-- Surgery Cases (Under POS) -->
+                                @if(auth()->user()->hasPermission('surgery.view') || auth()->user()->hasPermission('surgery.manage'))
                                 <a href="{{ route('reservations.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('reservations.*') || request()->routeIs('dispatch.*') || request()->routeIs('reconcile.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -107,49 +108,57 @@
                                     <span class="ml-3 nav-text">Surgery Cases</span>
                                 </a>
                                 @endif
+                                @endif
 
                                 <!-- Inventory -->
                                 @if(settings('module_inventory_enabled', true))
-                                    @if(auth()->user()->hasRole(['admin', 'staff']))
+                                    @if(auth()->user()->hasPermission('inventory.view') || auth()->user()->hasPermission('inventory.edit') || auth()->user()->hasPermission('inventory.adjust'))
                                     <a href="{{ route('inventory.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('inventory.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                                         </svg>
                                         <span class="ml-3 nav-text">Inventory</span>
                                     </a>
+                                    @if(auth()->user()->hasPermission('inventory.categories'))
                                     <a href="{{ route('inventory.categories') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('inventory.categories') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                                         </svg>
                                         <span class="ml-3 nav-text">Categories</span>
                                     </a>
-                                    @if(auth()->user()->hasRole('admin'))
-                                    <a href="{{ route('inventory.health') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('inventory.health') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
-                                        <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <span class="ml-3 nav-text">Health Dashboard</span>
-                                    </a>
                                     @endif
-                                    @if(auth()->user()->hasRole(['admin', 'accountant']))
+                                    <!-- Stock Takes (Financial Audit) -->
+                                    @if(auth()->user()->hasPermission('stock.view') || auth()->user()->hasPermission('stock.create'))
                                     <a href="{{ route('stock-takes.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('stock-takes.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                                         </svg>
                                         <span class="ml-3 nav-text">Stock Takes</span>
                                     </a>
+                                    @endif
+                                    
+                                    <!-- Stock Transfers -->
+                                    @if(auth()->user()->hasPermission('stock.transfers.view') || auth()->user()->hasPermission('stock.transfers.manage'))
                                     <a href="{{ route('stock-transfers.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('stock-transfers.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                                         </svg>
                                         <span class="ml-3 nav-text">Stock Transfers</span>
                                     </a>
+                                    @endif
+                                    
+                                    <!-- Surgical Sets -->
+                                    @if(auth()->user()->hasPermission('inventory.view'))
                                     <a href="{{ route('sets.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('sets.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                                         </svg>
                                         <span class="ml-3 nav-text">Surgical Sets</span>
                                     </a>
+                                    @endif
+                                    
+                                    <!-- Packages -->
+                                    @if(auth()->user()->hasPermission('packages.view') || auth()->user()->hasPermission('packages.manage'))
                                     <a href="{{ route('packages.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('packages.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -161,7 +170,7 @@
                                 @endif
 
                                 <!-- Batch & Serial Tracking -->
-                                @if(auth()->user()->hasRole(['admin', 'staff']))
+                                @if(auth()->user()->hasPermission('inventory.batches'))
                                     <a href="{{ route('batches.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('batches.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -171,7 +180,7 @@
                                 @endif
 
                                 <!-- Consignment Management -->
-                                @if(auth()->user()->hasRole(['admin', 'staff', 'accountant']))
+                                @if(auth()->user()->hasPermission('consignments.view') || auth()->user()->hasPermission('consignments.manage'))
                                     <a href="{{ route('consignment.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('consignment.*') || request()->routeIs('sales.consignments.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -179,7 +188,7 @@
                                         <span class="ml-3 nav-text">Consignment</span>
                                     </a>
                                     <!-- Consignment Sub-items -->
-                                    @if(auth()->user()->hasRole(['admin', 'staff']))
+                                    @if(auth()->user()->hasPermission('consignments.view') || auth()->user()->hasPermission('consignments.manage'))
                                     <a href="{{ route('consignment.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('consignment.*') && !request()->routeIs('sales.consignments.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -187,7 +196,7 @@
                                         <span class="ml-3 nav-text">Stock Tracking</span>
                                     </a>
                                     @endif
-                                    @if(settings('module_consignments_enabled', true) && auth()->user()->hasRole(['admin', 'staff', 'accountant']))
+                                    @if(settings('module_consignments_enabled', true) && (auth()->user()->hasPermission('consignments.view') || auth()->user()->hasPermission('consignments.manage')))
                                     <a href="{{ route('sales.consignments.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('sales.consignments.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -195,19 +204,17 @@
                                         <span class="ml-3 nav-text">Surgery Sales</span>
                                     </a>
                                     @endif
-                                    
-                                    <!-- Surgery Management (Moved to under POS) -->
                                 @endif
 
                                 <!-- Sales -->
-                                @if(auth()->user()->hasRole(['admin', 'accountant', 'staff']))
+                                @if(auth()->user()->hasPermission('sales.view') || auth()->user()->hasPermission('sales.refund') || auth()->user()->hasPermission('sales.invoices'))
                                 <a href="{{ route('sales.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('sales.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                     </svg>
                                     <span class="ml-3 nav-text">Sales</span>
                                 </a>
-                                @if(auth()->user()->hasRole(['admin', 'accountant']))
+                                @if(auth()->user()->hasPermission('sales.invoices'))
                                 <a href="{{ route('sales.invoices.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('sales.invoices.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l2-2 4 4m0 0l2-2m-2 2V6a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2h3" />
@@ -218,7 +225,7 @@
                                 @endif
 
                                 <!-- Customers -->
-                                @if(settings('module_customers_enabled', true) && auth()->user()->hasRole(['admin', 'staff', 'accountant']))
+                                @if(settings('module_customers_enabled', true) && (auth()->user()->hasPermission('customers.view') || auth()->user()->hasPermission('customers.manage')))
                                 <a href="{{ route('customers.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('customers.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -227,8 +234,8 @@
                                 </a>
                                 @endif
 
-                                <!-- Refunds (Admin & Accountant) -->
-                                @if(auth()->user()->hasRole(['admin', 'accountant']))
+                                <!-- Refunds -->
+                                @if(auth()->user()->hasPermission('refunds.view') || auth()->user()->hasPermission('refunds.process') || auth()->user()->hasPermission('sales.refund'))
                                 <a href="{{ route('refunds.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('refunds.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
@@ -238,7 +245,7 @@
                                 @endif
 
                                 <!-- Orders & LPOs -->
-                                @if(settings('module_orders_enabled', true) && auth()->user()->hasRole(['admin', 'staff']))
+                                @if(settings('module_orders_enabled', true) && (auth()->user()->hasPermission('orders.create') || auth()->user()->hasPermission('orders.approve')))
                                 <a href="{{ route('orders.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('orders.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -260,7 +267,7 @@
                                 @endif
 
                                 <!-- Suppliers -->
-                                @if(settings('module_suppliers_enabled', true) && auth()->user()->hasRole(['admin', 'staff']))
+                                @if(settings('module_suppliers_enabled', true) && (auth()->user()->hasPermission('suppliers.view') || auth()->user()->hasPermission('suppliers.manage')))
                                 <a href="{{ route('suppliers.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('suppliers.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -270,7 +277,7 @@
                                 @endif
 
                                 <!-- Commissions -->
-                                @if(settings('module_commissions_enabled', true) && auth()->user()->hasRole(['admin', 'accountant', 'staff']))
+                                @if(settings('module_commissions_enabled', true) && (auth()->user()->hasPermission('commissions.view') || auth()->user()->hasPermission('commissions.manage')))
                                 <a href="{{ route('commissions.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('commissions.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -296,23 +303,42 @@
 
                                 <!-- Accounting & Expenses -->
                                 @if(settings('module_accounting_enabled', true))
-                                    @if(auth()->user()->hasRole(['admin', 'accountant']))
+                                    @php
+                                        $hasAccountingAccess = auth()->user()->hasPermission('accounting.view') 
+                                            || auth()->user()->hasPermission('accounting.manage') 
+                                            || auth()->user()->hasPermission('accounting.reports')
+                                            || auth()->user()->hasPermission('accounting.journal')
+                                            || auth()->user()->hasPermission('accounting.periods')
+                                            || auth()->user()->hasPermission('payroll.view')
+                                            || auth()->user()->hasPermission('payroll.process')
+                                            || auth()->user()->hasPermission('payroll.deductions')
+                                            || auth()->user()->hasPermission('payroll.reimbursements')
+                                            || auth()->user()->hasPermission('banking.view')
+                                            || auth()->user()->hasPermission('banking.manage')
+                                            || auth()->user()->hasPermission('banking.reconcile')
+                                            || auth()->user()->hasPermission('expenses.view')
+                                            || auth()->user()->hasPermission('expenses.manage');
+                                    @endphp
+                                    @if($hasAccountingAccess)
                                     <a href="{{ route('accounting.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('accounting.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                         </svg>
                                         <span class="ml-3 nav-text">Accounting</span>
                                     </a>
-                                    <a href="{{ route('expenses.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('expenses.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
+                                    @endif
+                                    @if(auth()->user()->hasPermission('expenses.view') || auth()->user()->hasPermission('expenses.manage'))
+                                    <a href="{{ route('expenses.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('expenses.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                                         </svg>
                                         <span class="ml-3 nav-text">Expenses</span>
                                     </a>
+                                    @endif
 
                                     
                                     <!-- Admin: Approve Reimbursements (Sub-item) -->
-                                    @if(auth()->user()->hasRole('admin'))
+                                    @if(auth()->user()->hasPermission('payroll.reimbursements'))
                                     <a href="{{ route('reimbursements.index', ['status' => 'pending']) }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md ml-6 {{ request()->routeIs('reimbursements.*') && request()->get('status') === 'pending' ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                         <svg class="mr-3 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -326,31 +352,37 @@
                                         @endif
                                     </a>
                                     @endif
-
-
-                                    @endif
                                 @endif
 
                                 <!-- Reports -->
-                                @if(settings('module_reports_enabled', true) && auth()->user()->hasRole(['admin', 'accountant']))
+                                @if(settings('module_reports_enabled', true) && (auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('finance.view') || auth()->user()->hasPermission('reports.analytics')))
                                 <a href="{{ route('reports.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('reports.index') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                                     </svg>
                                     <span class="ml-3 nav-text">Reports & AI</span>
                                 </a>
-
                                 @endif
 
 
 
                                 <!-- Assets -->
-                                @if(settings('module_rentals_enabled', true) && auth()->user()->hasRole('admin'))
+                                @if(settings('module_rentals_enabled', true) && (auth()->user()->hasPermission('assets.view') || auth()->user()->hasPermission('assets.manage')))
                                 <a href="{{ route('assets.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('assets.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                                     </svg>
                                     <span class="ml-3 nav-text">Assets</span>
+                                </a>
+                                @endif
+
+                                <!-- Rentals -->
+                                @if(settings('module_rentals_enabled', true) && (auth()->user()->hasPermission('rentals.view') || auth()->user()->hasPermission('rentals.manage')))
+                                <a href="{{ route('rentals.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('rentals.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
+                                    <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                                    </svg>
+                                    <span class="ml-3 nav-text">Rentals</span>
                                 </a>
                                 @endif
 
@@ -370,8 +402,8 @@
 
 
 
-                                <!-- Settings -->
-                                @if(auth()->user()->hasRole(['admin', 'staff', 'accountant']))
+                                <!-- Settings (All authenticated users can access for password change and preferences) -->
+                                @if(auth()->user()->hasPermission('settings.view') || auth()->user()->hasPermission('settings.manage') || auth()->user()->hasPermission('settings.company') || auth()->user()->hasPermission('settings.users') || auth()->user()->hasRole(['staff', 'accountant']))
                                 <a href="{{ route('settings.index') }}" class="group flex items-center px-2 py-2 text-sm font-medium rounded-md {{ request()->routeIs('settings.*') ? 'bg-indigo-700 text-white' : 'text-indigo-100 hover:bg-indigo-700 hover:text-white' }}">
                                     <svg class="mr-3 h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

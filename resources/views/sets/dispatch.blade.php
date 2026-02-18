@@ -7,7 +7,7 @@
         <p class="text-gray-600">Assign a set to Case #{{ $reservation->id }} for {{ $reservation->surgery_date->format('M d, Y') }}</p>
     </div>
 
-    <form action="{{ route('dispatch.store', $reservation->id) }}" method="POST" class="bg-white shadow rounded-lg p-6">
+    <form action="{{ route('dispatch.store', $reservation->id) }}" method="POST" class="bg-white shadow rounded-lg p-6" onsubmit="document.getElementById('dispatch-btn').disabled = true; document.getElementById('dispatch-btn').innerText = 'Processing...';">
         @csrf
         
         <!-- Case Details -->
@@ -80,7 +80,7 @@
 
         <div class="flex justify-end gap-3">
             <a href="{{ route('reservations.show', $reservation->id) }}" class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50">Cancel</a>
-            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm" 
+            <button type="submit" id="dispatch-btn" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 shadow-sm" 
                 {{ $availableSets->isEmpty() ? 'disabled' : '' }}>
                 Confirm Dispatch
             </button>
